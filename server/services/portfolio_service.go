@@ -291,6 +291,8 @@ func (s *PortfolioService) getOrCreatePortfolio(userID primitive.ObjectID, symbo
 
 // GetUserHoldings calculates and returns all holdings for a user
 func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID) ([]Holding, error) {
+	fmt.Printf("[Portfolio] GetUserHoldings called for user: %s\n", userID.Hex())
+	
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -299,37 +301,48 @@ func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID) ([]Holding
 	// Get all transactions for the user
 	cursor, err := collection.Find(ctx, bson.M{"user_id": userID})
 	if err != nil {
+		fmt.Printf("[Portfolio] ERROR: Failed to fetch transactions for user %s: %v\n", userID.Hex(), err)
 		return nil, fmt.Errorf("failed to fetch transactions: %w", err)
 	}
 	defer cursor.Close(ctx)
 
 	var transactions []models.Transaction
 	if err := cursor.All(ctx, &transactions); err != nil {
+		fmt.Printf("[Portfolio] ERROR: Failed to decode transactions for user %s: %v\n", userID.Hex(), err)
 		return nil, fmt.Errorf("failed to decode transactions: %w", err)
 	}
+	
+	fmt.Printf("[Portfolio] Found %d transactions for user %s\n", len(transactions), userID.Hex())
 
 	// Group transactions by symbol
 	symbolTransactions := make(map[string][]models.Transaction)
 	for _, tx := range transactions {
 		symbolTransactions[tx.Symbol] = append(symbolTransactions[tx.Symbol], tx)
 	}
+	
+	fmt.Printf("[Portfolio] Grouped into %d unique symbols\n", len(symbolTransactions))
 
 	// Calculate holdings for each symbol
 	holdings := make([]Holding, 0)
 	for symbol, txs := range symbolTransactions {
+		fmt.Printf("[Portfolio] Calculating holding for symbol: %s (%d transactions)\n", symbol, len(txs))
 		holding, err := s.calculateHolding(symbol, txs)
 		if err != nil {
 			// Log error but continue with other holdings
-			fmt.Printf("Error calculating holding for %s: %v\n", symbol, err)
+			fmt.Printf("[Portfolio] ERROR: Failed to calculate holding for %s: %v\n", symbol, err)
 			continue
 		}
 
 		// Filter out holdings with zero shares
 		if holding.Shares > 0 {
+			fmt.Printf("[Portfolio] Added holding: %s (%.2f shares, value: %.2f)\n", symbol, holding.Shares, holding.CurrentValue)
 			holdings = append(holdings, *holding)
+		} else {
+			fmt.Printf("[Portfolio] Skipped holding %s (zero shares)\n", symbol)
 		}
 	}
-
+	
+	fmt.Printf("[Portfolio] Returning %d holdings for user %s\n", len(holdings), userID.Hex())
 	return holdings, nil
 }
 
@@ -406,11 +419,13 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 	}
 
 	// Fetch current price from stock service
+	fmt.Printf("[Portfolio] Fetching stock info for symbol: %s\n", symbol)
 	stockInfo, err := s.stockService.GetStockInfo(symbol)
 	if err != nil {
-		fmt.Printf("Error fetching stock info for symbol %s: %v\n", symbol, err)
+		fmt.Printf("[Portfolio] ERROR: Failed to fetch stock info for symbol %s: %v\n", symbol, err)
 		return nil, fmt.Errorf("failed to fetch stock info for %s: %w", symbol, err)
 	}
+	fmt.Printf("[Portfolio] Got stock info for %s: price=%.2f, currency=%s\n", symbol, stockInfo.CurrentPrice, stockInfo.Currency)
 
 	currentPrice := stockInfo.CurrentPrice
 	currentValue := currentPrice * totalShares

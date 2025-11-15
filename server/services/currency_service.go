@@ -268,12 +268,18 @@ func (s *CurrencyService) GetExchangeRate(from, to string) (float64, error) {
 
 // ConvertAmount converts an amount from one currency to another
 func (s *CurrencyService) ConvertAmount(amount float64, from, to string) (float64, error) {
+	fmt.Printf("[Currency] Converting %.2f from %s to %s\n", amount, from, to)
+	
 	rate, err := s.GetExchangeRate(from, to)
 	if err != nil {
+		fmt.Printf("[Currency] ERROR: Failed to get exchange rate %s->%s: %v\n", from, to, err)
 		return 0, err
 	}
 	
-	return amount * rate, nil
+	result := amount * rate
+	fmt.Printf("[Currency] Converted %.2f %s to %.2f %s (rate: %.6f)\n", amount, from, result, to, rate)
+	
+	return result, nil
 }
 
 // cleanupExpiredCache removes expired entries from cache

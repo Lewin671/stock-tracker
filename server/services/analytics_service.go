@@ -52,6 +52,8 @@ func NewAnalyticsService(portfolioService *PortfolioService, currencyService *Cu
 
 // GetDashboardMetrics calculates and returns dashboard metrics for a user
 func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, currency string) (*DashboardMetrics, error) {
+	fmt.Printf("[Analytics] GetDashboardMetrics called - UserID: %s, Currency: %s\n", userID.Hex(), currency)
+	
 	// Validate currency
 	if currency != "USD" && currency != "RMB" && currency != "CNY" {
 		return nil, fmt.Errorf("invalid currency: must be USD or RMB")
@@ -63,10 +65,13 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 	}
 	
 	// Fetch user holdings
+	fmt.Printf("[Analytics] Fetching holdings for user %s\n", userID.Hex())
 	holdings, err := s.portfolioService.GetUserHoldings(userID)
 	if err != nil {
+		fmt.Printf("[Analytics] ERROR: Failed to fetch holdings for user %s: %v\n", userID.Hex(), err)
 		return nil, fmt.Errorf("failed to fetch holdings: %w", err)
 	}
+	fmt.Printf("[Analytics] Successfully fetched %d holdings for user %s\n", len(holdings), userID.Hex())
 	
 	// If no holdings, return zero metrics
 	if len(holdings) == 0 {
@@ -85,14 +90,18 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 	allocation := make([]AllocationItem, 0, len(holdings))
 	
 	for _, holding := range holdings {
+		fmt.Printf("[Analytics] Processing holding: %s (%.2f shares, currency: %s)\n", holding.Symbol, holding.Shares, holding.Currency)
+		
 		// Convert holding value to requested currency if needed
 		holdingValue := holding.CurrentValue
 		holdingCostBasis := holding.CostBasis
 		
 		if holding.Currency != currency {
+			fmt.Printf("[Analytics] Converting %s from %s to %s\n", holding.Symbol, holding.Currency, currency)
 			// Convert current value
 			convertedValue, err := s.currencyService.ConvertAmount(holdingValue, holding.Currency, currency)
 			if err != nil {
+				fmt.Printf("[Analytics] ERROR: Failed to convert currency for %s: %v\n", holding.Symbol, err)
 				return nil, fmt.Errorf("failed to convert currency for %s: %w", holding.Symbol, err)
 			}
 			holdingValue = convertedValue
@@ -100,9 +109,11 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 			// Convert cost basis
 			convertedCostBasis, err := s.currencyService.ConvertAmount(holdingCostBasis, holding.Currency, currency)
 			if err != nil {
+				fmt.Printf("[Analytics] ERROR: Failed to convert cost basis for %s: %v\n", holding.Symbol, err)
 				return nil, fmt.Errorf("failed to convert currency for %s: %w", holding.Symbol, err)
 			}
 			holdingCostBasis = convertedCostBasis
+			fmt.Printf("[Analytics] Converted %s: value %.2f -> %.2f\n", holding.Symbol, holding.CurrentValue, holdingValue)
 		}
 		
 		totalValue += holdingValue
@@ -131,6 +142,9 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 	if totalCostBasis > 0 {
 		percentageReturn = (totalGain / totalCostBasis) * 100
 	}
+	
+	fmt.Printf("[Analytics] Dashboard metrics calculated - TotalValue: %.2f, TotalGain: %.2f, Return: %.2f%%\n", 
+		totalValue, totalGain, percentageReturn)
 	
 	return &DashboardMetrics{
 		TotalValue:       totalValue,

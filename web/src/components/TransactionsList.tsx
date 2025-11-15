@@ -48,7 +48,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
 
     try {
       const response = await axiosInstance.get(`/api/portfolio/transactions/${symbol}`);
-      setTransactions(response.data || []);
+      setTransactions(response.data.transactions || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load transactions');
     } finally {

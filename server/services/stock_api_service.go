@@ -126,38 +126,67 @@ func (s *StockAPIService) fetchFromYahooChart(symbol string, period1, period2 in
 		symbol, period1, period2,
 	)
 	
+	fmt.Printf("[StockAPI] HTTP GET: %s\n", url)
+	
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to create HTTP request: %v\n", err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	
+	startTime := time.Now()
 	resp, err := s.httpClient.Do(req)
+	duration := time.Since(startTime)
+	
 	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: HTTP request failed after %v: %v\n", duration, err)
 		return nil, fmt.Errorf("%w: %v", ErrExternalAPI, err)
 	}
 	defer resp.Body.Close()
 	
+	fmt.Printf("[StockAPI] HTTP response received in %v, status: %d\n", duration, resp.StatusCode)
+	
 	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[StockAPI] ERROR: Non-OK status code: %d\n", resp.StatusCode)
 		return nil, fmt.Errorf("%w: status code %d", ErrExternalAPI, resp.StatusCode)
 	}
 	
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to read response body: %v\n", err)
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 	
+	fmt.Printf("[StockAPI] Response body size: %d bytes\n", len(body))
+	
 	var chartResp yahooChartResponse
 	if err := json.Unmarshal(body, &chartResp); err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to parse JSON response: %v\n", err)
+		fmt.Printf("[StockAPI] Response body preview: %s\n", string(body[:min(len(body), 500)]))
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 	
 	if len(chartResp.Chart.Result) == 0 {
+		fmt.Printf("[StockAPI] ERROR: Empty result set from Yahoo Finance for symbol %s\n", symbol)
+		if chartResp.Chart.Error != nil {
+			fmt.Printf("[StockAPI] Yahoo Finance error: %v\n", chartResp.Chart.Error)
+		}
 		return nil, ErrStockNotFound
 	}
 	
+	fmt.Printf("[StockAPI] Successfully parsed response, got %d result(s)\n", len(chartResp.Chart.Result))
+	
 	return &chartResp, nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // extractStockInfo extracts StockInfo from Yahoo Chart API response
@@ -333,30 +362,43 @@ func (s *StockAPIService) cleanupExpiredCache() {
 func (s *StockAPIService) GetStockInfo(symbol string) (*StockInfo, error) {
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 	
+	fmt.Printf("[StockAPI] GetStockInfo called for symbol: %s\n", symbol)
+	
 	if symbol == "" {
+		fmt.Printf("[StockAPI] ERROR: Empty symbol provided\n")
 		return nil, ErrInvalidSymbol
 	}
 	
 	// Check cache first
 	if cached, found := s.getCachedStockInfo(symbol); found {
+		fmt.Printf("[StockAPI] Cache HIT for %s (price: %.2f)\n", symbol, cached.CurrentPrice)
 		return cached, nil
 	}
+	fmt.Printf("[StockAPI] Cache MISS for %s, fetching from Yahoo Finance\n", symbol)
 	
 	// Fetch from Yahoo Finance Chart API
 	// Use a short time range (last 1 day) to get current price
 	endTime := time.Now()
 	startTime := endTime.AddDate(0, 0, -1)
 	
+	fmt.Printf("[StockAPI] Calling Yahoo Finance API for %s (period: %s to %s)\n", 
+		symbol, startTime.Format("2006-01-02"), endTime.Format("2006-01-02"))
+	
 	response, err := s.fetchFromYahooChart(symbol, startTime.Unix(), endTime.Unix())
 	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Yahoo Finance API call failed for %s: %v\n", symbol, err)
 		return nil, err
 	}
 	
 	// Extract stock info from response
 	info, err := s.extractStockInfo(response)
 	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to extract stock info for %s: %v\n", symbol, err)
 		return nil, err
 	}
+	
+	fmt.Printf("[StockAPI] Successfully fetched %s: price=%.2f, currency=%s, name=%s\n", 
+		symbol, info.CurrentPrice, info.Currency, info.Name)
 	
 	// Cache the result
 	s.setCachedStockInfo(symbol, info)
