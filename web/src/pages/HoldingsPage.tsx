@@ -53,7 +53,9 @@ const HoldingsPage: React.FC = () => {
       const response = await axiosInstance.get('/api/portfolio/holdings', {
         params: { currency },
       });
-      setHoldings(response.data || []);
+      // Backend returns { holdings: [...] }
+      const holdingsData = response.data.holdings || [];
+      setHoldings(Array.isArray(holdingsData) ? holdingsData : []);
     } catch (err: any) {
       setError(err.message || 'Failed to load holdings');
     } finally {

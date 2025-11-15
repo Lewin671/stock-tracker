@@ -56,7 +56,9 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
       const response = await axiosInstance.get('/api/analytics/performance', {
         params: { period, currency },
       });
-      setData(response.data);
+      // Backend returns { period, currency, performance: [...] }
+      const performanceData = response.data.performance || [];
+      setData(Array.isArray(performanceData) ? performanceData : []);
     } catch (err: any) {
       setError(err.message || 'Failed to load historical performance');
     } finally {
