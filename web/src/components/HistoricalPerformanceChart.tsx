@@ -69,11 +69,13 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
   const periods: Period[] = ['1M', '3M', '6M', '1Y'];
 
   const chartData = {
-    labels: data.map((point) => point.date),
     datasets: [
       {
         label: 'Portfolio Value',
-        data: data.map((point) => point.value),
+        data: data.map((point) => ({
+          x: new Date(point.date).getTime(),
+          y: point.value,
+        })),
         borderColor: '#3B82F6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
@@ -107,7 +109,14 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
             })}`;
           },
           title: (context: any) => {
-            const date = new Date(context[0].label);
+            const timestamp = context[0].parsed.x;
+            const date = new Date(timestamp);
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+              return 'Invalid Date';
+            }
+            
             return date.toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',

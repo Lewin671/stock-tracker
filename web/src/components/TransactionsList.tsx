@@ -78,6 +78,12 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return dateString; // Return original string if date is invalid
+    }
+    
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
