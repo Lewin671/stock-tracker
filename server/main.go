@@ -39,8 +39,8 @@ func main() {
 	// Initialize services
 	authService := services.NewAuthService()
 	stockService := services.NewStockAPIService()
-	portfolioService := services.NewPortfolioService(stockService)
 	currencyService := services.NewCurrencyService()
+	portfolioService := services.NewPortfolioService(stockService, currencyService)
 	analyticsService := services.NewAnalyticsService(portfolioService, currencyService, stockService)
 	
 	// Start cache cleanup for stock service (run every 10 minutes)

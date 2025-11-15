@@ -64,9 +64,9 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 		currency = "RMB"
 	}
 	
-	// Fetch user holdings
-	fmt.Printf("[Analytics] Fetching holdings for user %s\n", userID.Hex())
-	holdings, err := s.portfolioService.GetUserHoldings(userID)
+	// Fetch user holdings in the requested currency
+	fmt.Printf("[Analytics] Fetching holdings for user %s in currency %s\n", userID.Hex(), currency)
+	holdings, err := s.portfolioService.GetUserHoldings(userID, currency)
 	if err != nil {
 		fmt.Printf("[Analytics] ERROR: Failed to fetch holdings for user %s: %v\n", userID.Hex(), err)
 		return nil, fmt.Errorf("failed to fetch holdings: %w", err)
@@ -85,44 +85,22 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 	}
 	
 	// Calculate total portfolio value and cost basis
+	// Holdings are already in the requested currency from GetUserHoldings
 	var totalValue float64
 	var totalCostBasis float64
 	allocation := make([]AllocationItem, 0, len(holdings))
 	
 	for _, holding := range holdings {
-		fmt.Printf("[Analytics] Processing holding: %s (%.2f shares, currency: %s)\n", holding.Symbol, holding.Shares, holding.Currency)
+		fmt.Printf("[Analytics] Processing holding: %s (%.2f shares, value: %.2f %s)\n", 
+			holding.Symbol, holding.Shares, holding.CurrentValue, holding.Currency)
 		
-		// Convert holding value to requested currency if needed
-		holdingValue := holding.CurrentValue
-		holdingCostBasis := holding.CostBasis
-		
-		if holding.Currency != currency {
-			fmt.Printf("[Analytics] Converting %s from %s to %s\n", holding.Symbol, holding.Currency, currency)
-			// Convert current value
-			convertedValue, err := s.currencyService.ConvertAmount(holdingValue, holding.Currency, currency)
-			if err != nil {
-				fmt.Printf("[Analytics] ERROR: Failed to convert currency for %s: %v\n", holding.Symbol, err)
-				return nil, fmt.Errorf("failed to convert currency for %s: %w", holding.Symbol, err)
-			}
-			holdingValue = convertedValue
-			
-			// Convert cost basis
-			convertedCostBasis, err := s.currencyService.ConvertAmount(holdingCostBasis, holding.Currency, currency)
-			if err != nil {
-				fmt.Printf("[Analytics] ERROR: Failed to convert cost basis for %s: %v\n", holding.Symbol, err)
-				return nil, fmt.Errorf("failed to convert currency for %s: %w", holding.Symbol, err)
-			}
-			holdingCostBasis = convertedCostBasis
-			fmt.Printf("[Analytics] Converted %s: value %.2f -> %.2f\n", holding.Symbol, holding.CurrentValue, holdingValue)
-		}
-		
-		totalValue += holdingValue
-		totalCostBasis += holdingCostBasis
+		totalValue += holding.CurrentValue
+		totalCostBasis += holding.CostBasis
 		
 		// Add to allocation
 		allocation = append(allocation, AllocationItem{
 			Symbol:     holding.Symbol,
-			Value:      holdingValue,
+			Value:      holding.CurrentValue,
 			Percentage: 0, // Will calculate after we have total
 		})
 	}

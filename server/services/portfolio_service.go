@@ -35,13 +35,15 @@ type Holding struct {
 
 // PortfolioService handles portfolio and transaction operations
 type PortfolioService struct {
-	stockService *StockAPIService
+	stockService    *StockAPIService
+	currencyService *CurrencyService
 }
 
 // NewPortfolioService creates a new PortfolioService instance
-func NewPortfolioService(stockService *StockAPIService) *PortfolioService {
+func NewPortfolioService(stockService *StockAPIService, currencyService *CurrencyService) *PortfolioService {
 	return &PortfolioService{
-		stockService: stockService,
+		stockService:    stockService,
+		currencyService: currencyService,
 	}
 }
 
@@ -289,9 +291,9 @@ func (s *PortfolioService) getOrCreatePortfolio(userID primitive.ObjectID, symbo
 	return portfolio.ID, nil
 }
 
-// GetUserHoldings calculates and returns all holdings for a user
-func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID) ([]Holding, error) {
-	fmt.Printf("[Portfolio] GetUserHoldings called for user: %s\n", userID.Hex())
+// GetUserHoldings calculates and returns all holdings for a user in the specified currency
+func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID, targetCurrency string) ([]Holding, error) {
+	fmt.Printf("[Portfolio] GetUserHoldings called for user: %s, currency: %s\n", userID.Hex(), targetCurrency)
 	
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -326,7 +328,7 @@ func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID) ([]Holding
 	holdings := make([]Holding, 0)
 	for symbol, txs := range symbolTransactions {
 		fmt.Printf("[Portfolio] Calculating holding for symbol: %s (%d transactions)\n", symbol, len(txs))
-		holding, err := s.calculateHolding(symbol, txs)
+		holding, err := s.calculateHolding(symbol, txs, targetCurrency)
 		if err != nil {
 			// Log error but continue with other holdings
 			fmt.Printf("[Portfolio] ERROR: Failed to calculate holding for %s: %v\n", symbol, err)
@@ -335,7 +337,7 @@ func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID) ([]Holding
 
 		// Filter out holdings with zero shares
 		if holding.Shares > 0 {
-			fmt.Printf("[Portfolio] Added holding: %s (%.2f shares, value: %.2f)\n", symbol, holding.Shares, holding.CurrentValue)
+			fmt.Printf("[Portfolio] Added holding: %s (%.2f shares, value: %.2f %s)\n", symbol, holding.Shares, holding.CurrentValue, targetCurrency)
 			holdings = append(holdings, *holding)
 		} else {
 			fmt.Printf("[Portfolio] Skipped holding %s (zero shares)\n", symbol)
@@ -371,16 +373,16 @@ func (s *PortfolioService) GetTransactionsBySymbol(userID primitive.ObjectID, sy
 }
 
 // calculateHolding calculates holding details for a symbol based on its transactions
-func (s *PortfolioService) calculateHolding(symbol string, transactions []models.Transaction) (*Holding, error) {
+func (s *PortfolioService) calculateHolding(symbol string, transactions []models.Transaction, targetCurrency string) (*Holding, error) {
 	if len(transactions) == 0 {
 		return nil, fmt.Errorf("no transactions for symbol")
 	}
 
 	var totalShares float64
 	var totalCost float64
-	var currency string
+	var transactionCurrency string
 
-	// Calculate total shares and cost basis
+	// Calculate total shares and cost basis in original transaction currency
 	for _, tx := range transactions {
 		if tx.Action == "buy" {
 			totalShares += tx.Shares
@@ -399,8 +401,8 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 		}
 
 		// Use currency from first transaction (all should be same currency per symbol)
-		if currency == "" {
-			currency = tx.Currency
+		if transactionCurrency == "" {
+			transactionCurrency = tx.Currency
 		}
 	}
 
@@ -414,7 +416,7 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 			CurrentValue:    0,
 			GainLoss:        0,
 			GainLossPercent: 0,
-			Currency:        currency,
+			Currency:        targetCurrency,
 		}, nil
 	}
 
@@ -427,22 +429,43 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 	}
 	fmt.Printf("[Portfolio] Got stock info for %s: price=%.2f, currency=%s\n", symbol, stockInfo.CurrentPrice, stockInfo.Currency)
 
-	currentPrice := stockInfo.CurrentPrice
-	currentValue := currentPrice * totalShares
-	gainLoss := currentValue - totalCost
+	// Convert cost basis to target currency if needed
+	convertedCostBasis := totalCost
+	if transactionCurrency != targetCurrency {
+		convertedCostBasis, err = s.currencyService.ConvertAmount(totalCost, transactionCurrency, targetCurrency)
+		if err != nil {
+			fmt.Printf("[Portfolio] ERROR: Failed to convert cost basis from %s to %s: %v\n", transactionCurrency, targetCurrency, err)
+			return nil, fmt.Errorf("failed to convert cost basis: %w", err)
+		}
+		fmt.Printf("[Portfolio] Converted cost basis from %.2f %s to %.2f %s\n", totalCost, transactionCurrency, convertedCostBasis, targetCurrency)
+	}
+
+	// Convert current price to target currency if needed
+	convertedCurrentPrice := stockInfo.CurrentPrice
+	if stockInfo.Currency != targetCurrency {
+		convertedCurrentPrice, err = s.currencyService.ConvertAmount(stockInfo.CurrentPrice, stockInfo.Currency, targetCurrency)
+		if err != nil {
+			fmt.Printf("[Portfolio] ERROR: Failed to convert price from %s to %s: %v\n", stockInfo.Currency, targetCurrency, err)
+			return nil, fmt.Errorf("failed to convert price: %w", err)
+		}
+		fmt.Printf("[Portfolio] Converted price from %.2f %s to %.2f %s\n", stockInfo.CurrentPrice, stockInfo.Currency, convertedCurrentPrice, targetCurrency)
+	}
+
+	currentValue := convertedCurrentPrice * totalShares
+	gainLoss := currentValue - convertedCostBasis
 	gainLossPercent := 0.0
-	if totalCost > 0 {
-		gainLossPercent = (gainLoss / totalCost) * 100
+	if convertedCostBasis > 0 {
+		gainLossPercent = (gainLoss / convertedCostBasis) * 100
 	}
 
 	return &Holding{
 		Symbol:          symbol,
 		Shares:          totalShares,
-		CostBasis:       totalCost,
-		CurrentPrice:    currentPrice,
+		CostBasis:       convertedCostBasis,
+		CurrentPrice:    convertedCurrentPrice,
 		CurrentValue:    currentValue,
 		GainLoss:        gainLoss,
 		GainLossPercent: gainLossPercent,
-		Currency:        stockInfo.Currency,
+		Currency:        targetCurrency,
 	}, nil
 }

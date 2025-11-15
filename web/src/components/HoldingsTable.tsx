@@ -70,17 +70,17 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
                 <div className="text-sm text-gray-900">{holding.shares.toFixed(2)}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm text-gray-900">{formatCurrency(holding.costBasis, currency)}</div>
+                <div className="text-sm text-gray-900">{formatCurrency(holding.costBasis, holding.currency)}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm text-gray-900">{formatCurrency(holding.currentPrice, currency)}</div>
+                <div className="text-sm text-gray-900">{formatCurrency(holding.currentPrice, holding.currency)}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
-                <div className="text-sm font-medium text-gray-900">{formatCurrency(holding.currentValue, currency)}</div>
+                <div className="text-sm font-medium text-gray-900">{formatCurrency(holding.currentValue, holding.currency)}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
                 <div className={`text-sm font-medium ${holding.gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(holding.gainLoss, currency)}
+                  {formatCurrency(holding.gainLoss, holding.currency)}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -123,20 +123,20 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-gray-500">Cost Basis</p>
-                <p className="font-medium text-gray-900">{formatCurrency(holding.costBasis, currency)}</p>
+                <p className="font-medium text-gray-900">{formatCurrency(holding.costBasis, holding.currency)}</p>
               </div>
               <div>
                 <p className="text-gray-500">Current Price</p>
-                <p className="font-medium text-gray-900">{formatCurrency(holding.currentPrice, currency)}</p>
+                <p className="font-medium text-gray-900">{formatCurrency(holding.currentPrice, holding.currency)}</p>
               </div>
               <div>
                 <p className="text-gray-500">Current Value</p>
-                <p className="font-medium text-gray-900">{formatCurrency(holding.currentValue, currency)}</p>
+                <p className="font-medium text-gray-900">{formatCurrency(holding.currentValue, holding.currency)}</p>
               </div>
               <div>
                 <p className="text-gray-500">Gain/Loss</p>
                 <p className={`font-medium ${holding.gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(holding.gainLoss, currency)}
+                  {formatCurrency(holding.gainLoss, holding.currency)}
                   <span className="ml-1">({formatPercent(holding.gainLossPercent)})</span>
                 </p>
               </div>

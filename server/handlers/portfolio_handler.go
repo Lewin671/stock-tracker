@@ -46,8 +46,14 @@ func (h *PortfolioHandler) GetHoldings(c *gin.Context) {
 		return
 	}
 
+	// Get currency parameter (default to USD)
+	currency := c.DefaultQuery("currency", "USD")
+	if currency != "USD" && currency != "RMB" {
+		currency = "USD"
+	}
+
 	// Get holdings
-	holdings, err := h.portfolioService.GetUserHoldings(userID)
+	holdings, err := h.portfolioService.GetUserHoldings(userID, currency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
