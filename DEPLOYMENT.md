@@ -23,7 +23,6 @@ Before deploying, ensure you have:
 - Vercel account (for frontend)
 - Render or Fly.io account (for backend)
 - All required API keys:
-  - Tushare API token
   - ExchangeRate-API key
   - Yahoo Finance API key (optional)
 
@@ -121,9 +120,8 @@ In the "Environment" section, add all variables:
 | PORT | 8080 | Render provides PORT automatically, but set default |
 | MONGODB_URI | `mongodb+srv://...` | Your MongoDB Atlas connection string |
 | JWT_SECRET | `<generate-strong-secret>` | Use 32+ character random string |
-| TUSHARE_TOKEN | `<your-token>` | From Tushare dashboard |
 | EXCHANGE_RATE_API_KEY | `<your-key>` | From ExchangeRate-API |
-| YAHOO_FINANCE_API_KEY | `<your-key>` | Optional |
+| YAHOO_FINANCE_API_KEY | `<your-key>` | Optional, for all markets |
 | CORS_ORIGIN | `https://your-frontend.vercel.app` | Your Vercel frontend URL |
 
 **Generate JWT Secret**:
@@ -218,7 +216,6 @@ primary_region = "sjc"
 # Set all secrets
 flyctl secrets set MONGODB_URI="mongodb+srv://..."
 flyctl secrets set JWT_SECRET="your-secret-here"
-flyctl secrets set TUSHARE_TOKEN="your-token"
 flyctl secrets set EXCHANGE_RATE_API_KEY="your-key"
 flyctl secrets set YAHOO_FINANCE_API_KEY="your-key"
 flyctl secrets set CORS_ORIGIN="https://your-frontend.vercel.app"
@@ -459,7 +456,8 @@ flyctl deploy
    - Rotate API keys periodically
 
 2. **Monitor API Usage**:
-   - Check Tushare and ExchangeRate-API usage
+   - Check ExchangeRate-API usage
+   - Monitor Yahoo Finance API rate limits
    - Set up alerts for rate limit approaching
 
 3. **Database Security**:

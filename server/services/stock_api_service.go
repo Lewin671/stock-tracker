@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +48,6 @@ type CachedHistoricalData struct {
 // StockAPIService handles stock data operations
 type StockAPIService struct {
 	httpClient           *http.Client
-	tushareToken         string
 	stockCache           map[string]*CachedStockData
 	historicalCache      map[string]*CachedHistoricalData
 	cacheMutex           sync.RWMutex
@@ -58,13 +56,10 @@ type StockAPIService struct {
 
 // NewStockAPIService creates a new StockAPIService instance
 func NewStockAPIService() *StockAPIService {
-	tushareToken := os.Getenv("TUSHARE_TOKEN")
-	
 	return &StockAPIService{
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		tushareToken:       tushareToken,
 		stockCache:         make(map[string]*CachedStockData),
 		historicalCache:    make(map[string]*CachedHistoricalData),
 		stockCacheDuration: 5 * time.Minute,
@@ -101,23 +96,16 @@ func (s *StockAPIService) IsChinaStock(symbol string) bool {
 }
 
 // Yahoo Finance API response structures
-type yahooQuoteResponse struct {
-	QuoteResponse struct {
-		Result []struct {
-			Symbol             string  `json:"symbol"`
-			ShortName          string  `json:"shortName"`
-			LongName           string  `json:"longName"`
-			RegularMarketPrice float64 `json:"regularMarketPrice"`
-			Currency           string  `json:"currency"`
-			Sector             string  `json:"sector"`
-		} `json:"result"`
-		Error interface{} `json:"error"`
-	} `json:"quoteResponse"`
-}
-
 type yahooChartResponse struct {
 	Chart struct {
 		Result []struct {
+			Meta struct {
+				Symbol             string  `json:"symbol"`
+				Currency           string  `json:"currency"`
+				RegularMarketPrice float64 `json:"regularMarketPrice"`
+				LongName           string  `json:"longName"`
+				ShortName          string  `json:"shortName"`
+			} `json:"meta"`
 			Timestamp  []int64 `json:"timestamp"`
 			Indicators struct {
 				Quote []struct {
@@ -129,94 +117,13 @@ type yahooChartResponse struct {
 	} `json:"chart"`
 }
 
-// GetStockInfoUS fetches stock information for US stocks from Yahoo Finance
-func (s *StockAPIService) GetStockInfoUS(symbol string) (*StockInfo, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	
-	// Build Yahoo Finance API URL
-	url := fmt.Sprintf("https://query1.finance.yahoo.com/v7/finance/quote?symbols=%s", symbol)
-	
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-	
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrExternalAPI, err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status code %d", ErrExternalAPI, resp.StatusCode)
-	}
-	
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-	
-	var quoteResp yahooQuoteResponse
-	if err := json.Unmarshal(body, &quoteResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-	
-	if len(quoteResp.QuoteResponse.Result) == 0 {
-		return nil, ErrStockNotFound
-	}
-	
-	result := quoteResp.QuoteResponse.Result[0]
-	
-	// Use shortName or longName
-	name := result.ShortName
-	if name == "" {
-		name = result.LongName
-	}
-	
-	// Default to USD if currency not specified
-	currency := result.Currency
-	if currency == "" {
-		currency = "USD"
-	}
-	
-	return &StockInfo{
-		Symbol:       result.Symbol,
-		Name:         name,
-		CurrentPrice: result.RegularMarketPrice,
-		Currency:     strings.ToUpper(currency),
-		Sector:       result.Sector,
-	}, nil
-}
 
-// GetHistoricalDataUS fetches historical price data for US stocks from Yahoo Finance
-func (s *StockAPIService) GetHistoricalDataUS(symbol string, period string) ([]HistoricalPrice, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	
-	// Calculate time range based on period
-	endTime := time.Now()
-	var startTime time.Time
-	
-	switch period {
-	case "1M":
-		startTime = endTime.AddDate(0, -1, 0)
-	case "3M":
-		startTime = endTime.AddDate(0, -3, 0)
-	case "6M":
-		startTime = endTime.AddDate(0, -6, 0)
-	case "1Y":
-		startTime = endTime.AddDate(-1, 0, 0)
-	default:
-		return nil, ErrInvalidPeriod
-	}
-	
-	// Build Yahoo Finance chart API URL
+
+// fetchFromYahooChart calls Yahoo Finance Chart API with the specified parameters
+func (s *StockAPIService) fetchFromYahooChart(symbol string, period1, period2 int64) (*yahooChartResponse, error) {
 	url := fmt.Sprintf(
 		"https://query1.finance.yahoo.com/v8/finance/chart/%s?period1=%d&period2=%d&interval=1d",
-		symbol,
-		startTime.Unix(),
-		endTime.Unix(),
+		symbol, period1, period2,
 	)
 	
 	req, err := http.NewRequest("GET", url, nil)
@@ -224,7 +131,7 @@ func (s *StockAPIService) GetHistoricalDataUS(symbol string, period string) ([]H
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
@@ -250,7 +157,52 @@ func (s *StockAPIService) GetHistoricalDataUS(symbol string, period string) ([]H
 		return nil, ErrStockNotFound
 	}
 	
-	result := chartResp.Chart.Result[0]
+	return &chartResp, nil
+}
+
+// extractStockInfo extracts StockInfo from Yahoo Chart API response
+func (s *StockAPIService) extractStockInfo(response *yahooChartResponse) (*StockInfo, error) {
+	if len(response.Chart.Result) == 0 {
+		return nil, ErrStockNotFound
+	}
+	
+	result := response.Chart.Result[0]
+	meta := result.Meta
+	
+	// Prioritize longName, then shortName, finally symbol
+	name := meta.LongName
+	if name == "" {
+		name = meta.ShortName
+	}
+	if name == "" {
+		name = meta.Symbol
+	}
+	
+	// Get currency from meta, or infer from symbol suffix
+	currency := strings.ToUpper(meta.Currency)
+	if currency == "" {
+		if strings.HasSuffix(meta.Symbol, ".SS") || strings.HasSuffix(meta.Symbol, ".SZ") {
+			currency = "CNY"
+		} else {
+			currency = "USD"
+		}
+	}
+	
+	return &StockInfo{
+		Symbol:       meta.Symbol,
+		Name:         name,
+		CurrentPrice: meta.RegularMarketPrice,
+		Currency:     currency,
+	}, nil
+}
+
+// extractHistoricalData extracts historical price data from Yahoo Chart API response
+func (s *StockAPIService) extractHistoricalData(response *yahooChartResponse) ([]HistoricalPrice, error) {
+	if len(response.Chart.Result) == 0 {
+		return nil, ErrStockNotFound
+	}
+	
+	result := response.Chart.Result[0]
 	
 	if len(result.Indicators.Quote) == 0 {
 		return nil, ErrStockNotFound
@@ -259,13 +211,14 @@ func (s *StockAPIService) GetHistoricalDataUS(symbol string, period string) ([]H
 	timestamps := result.Timestamp
 	closes := result.Indicators.Quote[0].Close
 	
+	// Verify arrays have matching lengths
 	if len(timestamps) != len(closes) {
 		return nil, fmt.Errorf("mismatched data length")
 	}
 	
 	historicalData := make([]HistoricalPrice, 0, len(timestamps))
 	for i := 0; i < len(timestamps); i++ {
-		// Skip null values
+		// Filter out zero prices
 		if closes[i] == 0 {
 			continue
 		}
@@ -279,240 +232,19 @@ func (s *StockAPIService) GetHistoricalDataUS(symbol string, period string) ([]H
 	return historicalData, nil
 }
 
-// Tushare API request/response structures
-type tushareRequest struct {
-	APIName string                 `json:"api_name"`
-	Token   string                 `json:"token"`
-	Params  map[string]interface{} `json:"params"`
-	Fields  string                 `json:"fields"`
-}
 
-type tushareResponse struct {
-	Code int `json:"code"`
-	Msg  string `json:"msg"`
-	Data struct {
-		Fields []string        `json:"fields"`
-		Items  [][]interface{} `json:"items"`
-	} `json:"data"`
-}
 
-// convertTushareSymbol converts symbol format between Yahoo (.SS/.SZ) and Tushare format
-// Yahoo: 600000.SS -> Tushare: 600000.SH
-// Yahoo: 000001.SZ -> Tushare: 000001.SZ
-func (s *StockAPIService) convertTushareSymbol(symbol string, toTushare bool) string {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	
-	if toTushare {
-		// Convert .SS to .SH for Tushare
-		if strings.HasSuffix(symbol, ".SS") {
-			return strings.Replace(symbol, ".SS", ".SH", 1)
-		}
-	} else {
-		// Convert .SH to .SS for Yahoo format
-		if strings.HasSuffix(symbol, ".SH") {
-			return strings.Replace(symbol, ".SH", ".SS", 1)
-		}
-	}
-	
-	return symbol
-}
 
-// callTushareAPI makes a request to Tushare API
-func (s *StockAPIService) callTushareAPI(apiName string, params map[string]interface{}, fields string) (*tushareResponse, error) {
-	if s.tushareToken == "" {
-		return nil, fmt.Errorf("%w: Tushare token not configured", ErrExternalAPI)
-	}
-	
-	reqBody := tushareRequest{
-		APIName: apiName,
-		Token:   s.tushareToken,
-		Params:  params,
-		Fields:  fields,
-	}
-	
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-	
-	req, err := http.NewRequest("POST", "http://api.tushare.pro", strings.NewReader(string(jsonData)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	
-	req.Header.Set("Content-Type", "application/json")
-	
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrExternalAPI, err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status code %d", ErrExternalAPI, resp.StatusCode)
-	}
-	
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-	
-	var tushareResp tushareResponse
-	if err := json.Unmarshal(body, &tushareResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-	
-	if tushareResp.Code != 0 {
-		return nil, fmt.Errorf("%w: %s", ErrExternalAPI, tushareResp.Msg)
-	}
-	
-	return &tushareResp, nil
-}
 
-// GetStockInfoChina fetches stock information for Chinese stocks from Tushare
-func (s *StockAPIService) GetStockInfoChina(symbol string) (*StockInfo, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	tushareSymbol := s.convertTushareSymbol(symbol, true)
-	
-	// Get daily quote data
-	params := map[string]interface{}{
-		"ts_code": tushareSymbol,
-	}
-	
-	resp, err := s.callTushareAPI("daily", params, "ts_code,trade_date,close")
-	if err != nil {
-		return nil, err
-	}
-	
-	if len(resp.Data.Items) == 0 {
-		return nil, ErrStockNotFound
-	}
-	
-	// Get the most recent price (first item is most recent)
-	item := resp.Data.Items[0]
-	
-	var price float64
-	if priceVal, ok := item[2].(float64); ok {
-		price = priceVal
-	} else if priceStr, ok := item[2].(string); ok {
-		fmt.Sscanf(priceStr, "%f", &price)
-	}
-	
-	// Get stock basic info for name
-	basicParams := map[string]interface{}{
-		"ts_code": tushareSymbol,
-	}
-	
-	basicResp, err := s.callTushareAPI("stock_basic", basicParams, "ts_code,name")
-	if err != nil {
-		// If we can't get the name, still return with symbol as name
-		return &StockInfo{
-			Symbol:       symbol,
-			Name:         symbol,
-			CurrentPrice: price,
-			Currency:     "CNY",
-		}, nil
-	}
-	
-	name := symbol
-	if len(basicResp.Data.Items) > 0 && len(basicResp.Data.Items[0]) > 1 {
-		if nameStr, ok := basicResp.Data.Items[0][1].(string); ok {
-			name = nameStr
-		}
-	}
-	
-	return &StockInfo{
-		Symbol:       symbol,
-		Name:         name,
-		CurrentPrice: price,
-		Currency:     "CNY",
-	}, nil
-}
 
-// GetHistoricalDataChina fetches historical price data for Chinese stocks from Tushare
-func (s *StockAPIService) GetHistoricalDataChina(symbol string, period string) ([]HistoricalPrice, error) {
-	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	tushareSymbol := s.convertTushareSymbol(symbol, true)
-	
-	// Calculate time range based on period
-	endTime := time.Now()
-	var startTime time.Time
-	
-	switch period {
-	case "1M":
-		startTime = endTime.AddDate(0, -1, 0)
-	case "3M":
-		startTime = endTime.AddDate(0, -3, 0)
-	case "6M":
-		startTime = endTime.AddDate(0, -6, 0)
-	case "1Y":
-		startTime = endTime.AddDate(-1, 0, 0)
-	default:
-		return nil, ErrInvalidPeriod
-	}
-	
-	// Tushare uses YYYYMMDD format
-	startDateStr := startTime.Format("20060102")
-	endDateStr := endTime.Format("20060102")
-	
-	params := map[string]interface{}{
-		"ts_code":    tushareSymbol,
-		"start_date": startDateStr,
-		"end_date":   endDateStr,
-	}
-	
-	resp, err := s.callTushareAPI("daily", params, "trade_date,close")
-	if err != nil {
-		return nil, err
-	}
-	
-	if len(resp.Data.Items) == 0 {
-		return nil, ErrStockNotFound
-	}
-	
-	historicalData := make([]HistoricalPrice, 0, len(resp.Data.Items))
-	
-	for _, item := range resp.Data.Items {
-		if len(item) < 2 {
-			continue
-		}
-		
-		// Parse date (format: YYYYMMDD)
-		var dateStr string
-		if ds, ok := item[0].(string); ok {
-			dateStr = ds
-		} else {
-			continue
-		}
-		
-		date, err := time.Parse("20060102", dateStr)
-		if err != nil {
-			continue
-		}
-		
-		// Parse price
-		var price float64
-		if priceVal, ok := item[1].(float64); ok {
-			price = priceVal
-		} else if priceStr, ok := item[1].(string); ok {
-			fmt.Sscanf(priceStr, "%f", &price)
-		}
-		
-		if price > 0 {
-			historicalData = append(historicalData, HistoricalPrice{
-				Date:  date,
-				Price: price,
-			})
-		}
-	}
-	
-	// Tushare returns data in descending order, reverse it to ascending
-	for i, j := 0, len(historicalData)-1; i < j; i, j = i+1, j-1 {
-		historicalData[i], historicalData[j] = historicalData[j], historicalData[i]
-	}
-	
-	return historicalData, nil
-}
+
+
+
+
+
+
+
+
 
 // getCachedStockInfo retrieves stock info from cache if available and not expired
 func (s *StockAPIService) getCachedStockInfo(symbol string) (*StockInfo, bool) {
@@ -605,18 +337,18 @@ func (s *StockAPIService) GetStockInfo(symbol string) (*StockInfo, error) {
 		return cached, nil
 	}
 	
-	var info *StockInfo
-	var err error
+	// Fetch from Yahoo Finance Chart API
+	// Use a short time range (last 1 day) to get current price
+	endTime := time.Now()
+	startTime := endTime.AddDate(0, 0, -1)
 	
-	// Determine which API to use based on symbol
-	if s.IsChinaStock(symbol) {
-		info, err = s.GetStockInfoChina(symbol)
-	} else if s.IsUSStock(symbol) {
-		info, err = s.GetStockInfoUS(symbol)
-	} else {
-		return nil, ErrInvalidSymbol
+	response, err := s.fetchFromYahooChart(symbol, startTime.Unix(), endTime.Unix())
+	if err != nil {
+		return nil, err
 	}
 	
+	// Extract stock info from response
+	info, err := s.extractStockInfo(response)
 	if err != nil {
 		return nil, err
 	}
@@ -649,18 +381,29 @@ func (s *StockAPIService) GetHistoricalData(symbol string, period string) ([]His
 		return cached, nil
 	}
 	
-	var data []HistoricalPrice
-	var err error
+	// Calculate time range based on period
+	endTime := time.Now()
+	var startTime time.Time
 	
-	// Determine which API to use based on symbol
-	if s.IsChinaStock(symbol) {
-		data, err = s.GetHistoricalDataChina(symbol, period)
-	} else if s.IsUSStock(symbol) {
-		data, err = s.GetHistoricalDataUS(symbol, period)
-	} else {
-		return nil, ErrInvalidSymbol
+	switch period {
+	case "1M":
+		startTime = endTime.AddDate(0, -1, 0)
+	case "3M":
+		startTime = endTime.AddDate(0, -3, 0)
+	case "6M":
+		startTime = endTime.AddDate(0, -6, 0)
+	case "1Y":
+		startTime = endTime.AddDate(-1, 0, 0)
 	}
 	
+	// Fetch from Yahoo Finance Chart API
+	response, err := s.fetchFromYahooChart(symbol, startTime.Unix(), endTime.Unix())
+	if err != nil {
+		return nil, err
+	}
+	
+	// Extract historical data from response
+	data, err := s.extractHistoricalData(response)
 	if err != nil {
 		return nil, err
 	}

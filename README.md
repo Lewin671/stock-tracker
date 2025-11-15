@@ -8,7 +8,7 @@ A full-stack web application for tracking stock investments across US and Chines
 - **Go 1.21+** with Gin web framework
 - **MongoDB** for data persistence
 - **JWT** for authentication
-- External APIs: Yahoo Finance, Tushare, ExchangeRate-API
+- External APIs: Yahoo Finance, ExchangeRate-API
 
 ### Frontend
 - **React 18** with TypeScript
@@ -63,19 +63,15 @@ Before you begin, ensure you have the following installed:
 
 You'll need to obtain the following API keys:
 
-1. **Tushare API Token** (Required for Chinese stocks)
-   - Register at [Tushare](https://tushare.pro/)
-   - Navigate to your profile to get your token
-   - Free tier available with rate limits
-
-2. **ExchangeRate-API Key** (Required for currency conversion)
+1. **ExchangeRate-API Key** (Required for currency conversion)
    - Register at [ExchangeRate-API](https://www.exchangerate-api.com/)
    - Free tier: 1,500 requests/month
    - Get your API key from the dashboard
 
-3. **Yahoo Finance API Key** (Optional for US stocks)
-   - The application can work without this using the free Yahoo Finance endpoint
-   - For production use, consider [RapidAPI Yahoo Finance](https://rapidapi.com/apidojo/api/yahoo-finance1)
+2. **Yahoo Finance API Key** (Optional)
+   - The application works without this using the free Yahoo Finance Chart API
+   - Yahoo Finance provides stock data for all markets (US and Chinese stocks)
+   - For production use with higher rate limits, consider [RapidAPI Yahoo Finance](https://rapidapi.com/apidojo/api/yahoo-finance1)
 
 ### Backend Setup
 
@@ -101,7 +97,6 @@ You'll need to obtain the following API keys:
    MONGODB_URI=mongodb://localhost:27017/stock_portfolio
    # For MongoDB Atlas, use: mongodb+srv://username:password@cluster.mongodb.net/stock_portfolio
    JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
-   TUSHARE_TOKEN=your_tushare_token_here
    EXCHANGE_RATE_API_KEY=your_exchangerate_api_key_here
    YAHOO_FINANCE_API_KEY=optional_yahoo_finance_key
    CORS_ORIGIN=http://localhost:3000
@@ -199,9 +194,8 @@ cd web && npm start
 | PORT | Server port number | No (default: 8080) |
 | MONGODB_URI | MongoDB connection string | Yes |
 | JWT_SECRET | Secret key for JWT token generation | Yes |
-| TUSHARE_TOKEN | Tushare API token for Chinese stocks | Yes |
 | EXCHANGE_RATE_API_KEY | ExchangeRate-API key | Yes |
-| YAHOO_FINANCE_API_KEY | Yahoo Finance API key | No |
+| YAHOO_FINANCE_API_KEY | Yahoo Finance API key (for all markets) | No |
 | CORS_ORIGIN | Allowed frontend origin | Yes |
 
 ### Frontend (.env)
@@ -558,7 +552,7 @@ PORT=8081
 **Problem**: `503 Service Unavailable` when fetching stock data
 
 **Solutions**:
-- **Tushare**: Verify TUSHARE_TOKEN is correct and active
+- **Yahoo Finance**: The free Chart API may have rate limits or temporary outages
 - **ExchangeRate-API**: Check EXCHANGE_RATE_API_KEY is valid
 - **Rate Limits**: You may have exceeded free tier limits
 - **Network**: Check internet connection and firewall settings
