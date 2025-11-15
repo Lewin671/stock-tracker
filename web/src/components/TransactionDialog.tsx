@@ -178,15 +178,15 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
-              <Dialog.Title className="text-xl font-semibold text-gray-900">
+              <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-white">
                 {transaction ? 'Edit Transaction' : 'Add Transaction'}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -195,37 +195,37 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-sm text-red-800">{error}</p>
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Symbol */}
               <div>
-                <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Symbol *
                 </label>
                 <div className="relative">
-                  <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                   <input
                     id="symbol"
                     type="text"
                     value={formData.symbol}
                     onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.symbol ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                     }`}
                     placeholder="AAPL"
                     disabled={!!transaction}
                   />
                 </div>
-                {errors.symbol && <p className="mt-1 text-sm text-red-600">{errors.symbol}</p>}
+                {errors.symbol && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol}</p>}
               </div>
 
               {/* Action */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Action *
                 </label>
                 <div className="flex gap-4">
@@ -237,7 +237,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
                       onChange={(e) => handleChange('action', e.target.value)}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">Buy</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Buy</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -247,7 +247,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
                       onChange={(e) => handleChange('action', e.target.value)}
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">Sell</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Sell</span>
                   </label>
                 </div>
               </div>

@@ -56,26 +56,26 @@ const DashboardPage: React.FC = () => {
   return (
     <Layout>
       {/* Page Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Portfolio Dashboard</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Dashboard</h1>
             {/* Currency Toggle */}
             <ToggleGroup.Root
               type="single"
               value={currency}
               onValueChange={handleCurrencyChange}
-              className="inline-flex bg-gray-100 rounded-lg p-1"
+              className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1"
             >
               <ToggleGroup.Item
                 value="USD"
-                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white data-[state=on]:text-blue-600 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 data-[state=off]:hover:text-gray-900"
+                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
               >
                 USD
               </ToggleGroup.Item>
               <ToggleGroup.Item
                 value="RMB"
-                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white data-[state=on]:text-blue-600 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 data-[state=off]:hover:text-gray-900"
+                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
               >
                 RMB
               </ToggleGroup.Item>
@@ -88,14 +88,14 @@ const DashboardPage: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
           </div>
         ) : error ? (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">{error}</p>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
             <button
               onClick={fetchDashboardMetrics}
-              className="mt-2 text-sm text-red-600 hover:text-red-800 font-medium"
+              className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
             >
               Try again
             </button>
@@ -113,14 +113,14 @@ const DashboardPage: React.FC = () => {
             </div>
 
             {/* Allocation Chart */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Allocation</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Portfolio Allocation</h2>
               <AllocationPieChart data={metrics.allocation} />
             </div>
 
             {/* Historical Performance Chart */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Historical Performance</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historical Performance</h2>
               <HistoricalPerformanceChart currency={currency} />
             </div>
           </div>
