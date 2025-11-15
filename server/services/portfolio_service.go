@@ -408,7 +408,8 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 	// Fetch current price from stock service
 	stockInfo, err := s.stockService.GetStockInfo(symbol)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch stock info: %w", err)
+		fmt.Printf("Error fetching stock info for symbol %s: %v\n", symbol, err)
+		return nil, fmt.Errorf("failed to fetch stock info for %s: %w", symbol, err)
 	}
 
 	currentPrice := stockInfo.CurrentPrice

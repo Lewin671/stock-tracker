@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"stock-portfolio-tracker/services"
 	"strings"
@@ -15,6 +16,7 @@ func AuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
 		// Extract token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
+			fmt.Printf("Auth failed: No Authorization header for %s %s\n", c.Request.Method, c.Request.URL.Path)
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": gin.H{
 					"code":    "UNAUTHORIZED",
@@ -28,6 +30,7 @@ func AuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
 		// Check for Bearer token format
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
+			fmt.Printf("Auth failed: Invalid Authorization header format for %s %s\n", c.Request.Method, c.Request.URL.Path)
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": gin.H{
 					"code":    "UNAUTHORIZED",
@@ -43,6 +46,7 @@ func AuthMiddleware(authService *services.AuthService) gin.HandlerFunc {
 		// Validate token and get user
 		user, err := authService.ValidateToken(tokenString)
 		if err != nil {
+			fmt.Printf("Auth failed: Token validation error for %s %s: %v\n", c.Request.Method, c.Request.URL.Path, err)
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": gin.H{
 					"code":    "UNAUTHORIZED",

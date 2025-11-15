@@ -90,8 +90,8 @@ func (h *PortfolioHandler) AddTransaction(c *gin.Context) {
 	}
 
 	// Parse request body
-	var transaction models.Transaction
-	if err := c.ShouldBindJSON(&transaction); err != nil {
+	var req models.TransactionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": gin.H{
 				"code":    "VALIDATION_ERROR",
@@ -102,8 +102,19 @@ func (h *PortfolioHandler) AddTransaction(c *gin.Context) {
 		return
 	}
 
+	// Convert request to transaction model
+	transaction := &models.Transaction{
+		Symbol:   req.Symbol,
+		Action:   req.Action,
+		Shares:   req.Shares,
+		Price:    req.Price,
+		Currency: req.Currency,
+		Fees:     req.Fees,
+		Date:     req.Date,
+	}
+
 	// Add transaction
-	if err := h.portfolioService.AddTransaction(userID, &transaction); err != nil {
+	if err := h.portfolioService.AddTransaction(userID, transaction); err != nil {
 		// Handle specific errors
 		if err == services.ErrInsufficientShares {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -188,8 +199,8 @@ func (h *PortfolioHandler) UpdateTransaction(c *gin.Context) {
 	}
 
 	// Parse request body
-	var transaction models.Transaction
-	if err := c.ShouldBindJSON(&transaction); err != nil {
+	var req models.TransactionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": gin.H{
 				"code":    "VALIDATION_ERROR",
@@ -200,8 +211,19 @@ func (h *PortfolioHandler) UpdateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Convert request to transaction model
+	transaction := &models.Transaction{
+		Symbol:   req.Symbol,
+		Action:   req.Action,
+		Shares:   req.Shares,
+		Price:    req.Price,
+		Currency: req.Currency,
+		Fees:     req.Fees,
+		Date:     req.Date,
+	}
+
 	// Update transaction
-	if err := h.portfolioService.UpdateTransaction(userID, txID, &transaction); err != nil {
+	if err := h.portfolioService.UpdateTransaction(userID, txID, transaction); err != nil {
 		// Handle specific errors
 		if err == services.ErrTransactionNotFound {
 			c.JSON(http.StatusNotFound, gin.H{

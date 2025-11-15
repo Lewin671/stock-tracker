@@ -96,11 +96,75 @@ func (s *CurrencyService) getLastCachedRate(cacheKey string) (float64, bool) {
 	return cached.Rate, true
 }
 
+// getFallbackRate returns a hardcoded fallback exchange rate
+// These rates are approximate and should only be used when API is unavailable
+func (s *CurrencyService) getFallbackRate(from, to string) float64 {
+	// Fallback rates (approximate, as of Nov 2025)
+	fallbackRates := map[string]map[string]float64{
+		"USD": {
+			"RMB": 7.2,
+			"CNY": 7.2,
+			"EUR": 0.92,
+			"GBP": 0.79,
+			"JPY": 149.0,
+		},
+		"RMB": {
+			"USD": 0.139,
+			"EUR": 0.128,
+			"GBP": 0.110,
+			"JPY": 20.7,
+		},
+		"CNY": {
+			"USD": 0.139,
+			"EUR": 0.128,
+			"GBP": 0.110,
+			"JPY": 20.7,
+		},
+		"EUR": {
+			"USD": 1.09,
+			"RMB": 7.83,
+			"CNY": 7.83,
+			"GBP": 0.86,
+			"JPY": 162.0,
+		},
+		"GBP": {
+			"USD": 1.27,
+			"RMB": 9.14,
+			"CNY": 9.14,
+			"EUR": 1.16,
+			"JPY": 189.0,
+		},
+		"JPY": {
+			"USD": 0.0067,
+			"RMB": 0.048,
+			"CNY": 0.048,
+			"EUR": 0.0062,
+			"GBP": 0.0053,
+		},
+	}
+	
+	if rates, ok := fallbackRates[from]; ok {
+		if rate, ok := rates[to]; ok {
+			return rate
+		}
+	}
+	
+	return 0
+}
+
 // GetExchangeRate fetches the exchange rate from one currency to another
 func (s *CurrencyService) GetExchangeRate(from, to string) (float64, error) {
 	// Validate currency codes
 	if from == "" || to == "" {
 		return 0, ErrInvalidCurrencyCode
+	}
+	
+	// Normalize CNY to RMB
+	if from == "CNY" {
+		from = "RMB"
+	}
+	if to == "CNY" {
+		to = "RMB"
 	}
 	
 	// If same currency, return 1
@@ -116,13 +180,21 @@ func (s *CurrencyService) GetExchangeRate(from, to string) (float64, error) {
 		return rate, nil
 	}
 	
-	// If API key is not configured, try to use last cached rate
+	// If API key is not configured, use fallback rates
 	if s.apiKey == "" {
+		rate := s.getFallbackRate(from, to)
+		if rate > 0 {
+			log.Printf("WARNING: ExchangeRate-API key not configured, using fallback rate for %s -> %s: %.4f", from, to, rate)
+			// Cache the fallback rate
+			s.setCachedRate(cacheKey, rate)
+			return rate, nil
+		}
+		// Try to use last cached rate
 		if rate, found := s.getLastCachedRate(cacheKey); found {
 			log.Printf("WARNING: ExchangeRate-API key not configured, using stale cached rate for %s", cacheKey)
 			return rate, nil
 		}
-		return 0, fmt.Errorf("%w: API key not configured", ErrCurrencyAPIError)
+		return 0, fmt.Errorf("%w: API key not configured and no fallback rate available", ErrCurrencyAPIError)
 	}
 	
 	// Fetch from ExchangeRate-API

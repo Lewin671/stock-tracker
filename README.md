@@ -59,14 +59,15 @@ Before you begin, ensure you have the following installed:
   - Cloud: [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) (free tier available)
 - **Git** - [Download Git](https://git-scm.com/downloads)
 
-### API Keys Required
+### API Keys (Optional)
 
-You'll need to obtain the following API keys:
+The application works out-of-the-box with fallback rates and free APIs. However, for production use, you may want to obtain API keys:
 
-1. **ExchangeRate-API Key** (Required for currency conversion)
+1. **ExchangeRate-API Key** (Optional - fallback rates used if not configured)
    - Register at [ExchangeRate-API](https://www.exchangerate-api.com/)
    - Free tier: 1,500 requests/month
    - Get your API key from the dashboard
+   - **Without API key**: The app uses approximate fallback exchange rates (USD ↔ RMB: ~7.2)
 
 2. **Yahoo Finance API Key** (Optional)
    - The application works without this using the free Yahoo Finance Chart API

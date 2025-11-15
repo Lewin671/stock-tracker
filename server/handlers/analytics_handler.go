@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"stock-portfolio-tracker/services"
 
@@ -62,6 +63,8 @@ func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 	// Get dashboard metrics
 	metrics, err := h.analyticsService.GetDashboardMetrics(userID, currency)
 	if err != nil {
+		// Log the detailed error for debugging
+		fmt.Printf("Error fetching dashboard metrics for user %s: %v\n", userID.Hex(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"code":    "INTERNAL_SERVER_ERROR",
