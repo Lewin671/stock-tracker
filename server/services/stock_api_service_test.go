@@ -294,6 +294,23 @@ func TestErrorHandling_StockNotFound(t *testing.T) {
 	t.Logf("Invalid symbol error: %v", err)
 }
 
+func TestErrorHandling_InvalidSymbolWithZeroPrice(t *testing.T) {
+	service := NewStockAPIService()
+	
+	// Test with APPL (typo of AAPL) which may return zero price
+	_, err := service.GetStockInfo("APPL")
+	if err == nil {
+		t.Error("Expected error for APPL (invalid symbol with zero price), got nil")
+	}
+	
+	// Should return ErrStockNotFound since price is 0
+	if err != ErrStockNotFound && !errors.Is(err, ErrExternalAPI) {
+		t.Errorf("Expected ErrStockNotFound or ErrExternalAPI for APPL, got %v", err)
+	}
+	
+	t.Logf("APPL (invalid symbol) error: %v", err)
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || findSubstring(s, substr)))
 }

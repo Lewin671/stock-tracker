@@ -169,6 +169,11 @@ func (s *StockAPIService) extractStockInfo(response *yahooChartResponse) (*Stock
 	result := response.Chart.Result[0]
 	meta := result.Meta
 	
+	// Validate that we have a valid price
+	if meta.RegularMarketPrice <= 0 {
+		return nil, ErrStockNotFound
+	}
+	
 	// Prioritize longName, then shortName, finally symbol
 	name := meta.LongName
 	if name == "" {
