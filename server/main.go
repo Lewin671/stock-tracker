@@ -100,6 +100,7 @@ func main() {
 	routes.SetupPortfolioRoutes(router, portfolioService, authService)
 	routes.SetupCurrencyRoutes(router, currencyService)
 	routes.SetupAnalyticsRoutes(router, analyticsService, authService)
+	routes.SetupAssetStyleRoutes(router, authService)
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

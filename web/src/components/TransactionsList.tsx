@@ -3,6 +3,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { X, Edit, Trash, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 import axiosInstance from '../api/axios';
+import { useToast } from '../contexts/ToastContext';
+import { formatErrorMessage } from '../utils/errorHandler';
 
 interface Transaction {
   id: string;
@@ -30,6 +32,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
   onEdit,
   onTransactionDeleted,
 }) => {
+  const { showSuccess, showError } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +53,9 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
       const response = await axiosInstance.get(`/api/portfolio/transactions/${symbol}`);
       setTransactions(response.data.transactions || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load transactions');
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      showError('Failed to load transactions', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -63,9 +68,12 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
       await axiosInstance.delete(`/api/portfolio/transactions/${id}`);
       setTransactions(prev => prev.filter(t => t.id !== id));
       setDeleteId(null);
+      showSuccess('Transaction deleted', 'The transaction has been removed');
       onTransactionDeleted();
     } catch (err: any) {
-      setError(err.message || 'Failed to delete transaction');
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      showError('Failed to delete transaction', errorMessage);
     } finally {
       setDeleting(false);
     }

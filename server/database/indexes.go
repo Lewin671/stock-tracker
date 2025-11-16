@@ -30,6 +30,11 @@ func CreateIndexes() error {
 		return err
 	}
 
+	// Create indexes for AssetStyles collection
+	if err := createAssetStyleIndexes(ctx); err != nil {
+		return err
+	}
+
 	log.Println("Successfully created all database indexes")
 	return nil
 }
@@ -71,7 +76,28 @@ func createPortfolioIndexes(ctx context.Context) error {
 		Options: options.Index().SetUnique(true),
 	}
 
-	indexes := []mongo.IndexModel{userIDIndex, userSymbolIndex}
+	// Compound index on user_id + asset_style_id for grouping queries
+	userAssetStyleIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "user_id", Value: 1},
+			{Key: "asset_style_id", Value: 1},
+		},
+	}
+
+	// Compound index on user_id + asset_class for grouping queries
+	userAssetClassIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "user_id", Value: 1},
+			{Key: "asset_class", Value: 1},
+		},
+	}
+
+	indexes := []mongo.IndexModel{
+		userIDIndex,
+		userSymbolIndex,
+		userAssetStyleIndex,
+		userAssetClassIndex,
+	}
 	_, err := collection.Indexes().CreateMany(ctx, indexes)
 	if err != nil {
 		return err
@@ -121,5 +147,33 @@ func createTransactionIndexes(ctx context.Context) error {
 	}
 
 	log.Println("Created indexes on transactions collection")
+	return nil
+}
+
+// createAssetStyleIndexes creates indexes for the asset_styles collection
+func createAssetStyleIndexes(ctx context.Context) error {
+	collection := Database.Collection("asset_styles")
+
+	// Index on user_id
+	userIDIndex := mongo.IndexModel{
+		Keys: bson.D{{Key: "user_id", Value: 1}},
+	}
+
+	// Compound unique index on user_id + name (ensure unique names per user)
+	userNameIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "user_id", Value: 1},
+			{Key: "name", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
+	}
+
+	indexes := []mongo.IndexModel{userIDIndex, userNameIndex}
+	_, err := collection.Indexes().CreateMany(ctx, indexes)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Created indexes on asset_styles collection")
 	return nil
 }

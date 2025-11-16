@@ -2,6 +2,17 @@
 
 A full-stack web application for tracking stock investments across US and Chinese markets with real-time data integration, multi-currency support, and comprehensive performance analytics.
 
+## Features
+
+### Core Features
+- **Multi-Currency Support**: Track investments in USD and RMB with real-time exchange rates
+- **Real-Time Stock Data**: Integration with Yahoo Finance for US and Chinese markets
+- **Portfolio Analytics**: Comprehensive performance metrics and historical tracking
+- **Dashboard Grouping**: Organize holdings by Asset Style, Asset Class, Currency, or view individually
+- **Asset Classification**: Custom asset styles and standard asset classes for portfolio organization
+- **Interactive Charts**: Visual representation of allocation and performance with grouping support
+- **Secure Authentication**: JWT-based user authentication and authorization
+
 ## Tech Stack
 
 ### Backend
@@ -405,27 +416,93 @@ Response: 200 OK
 ]
 ```
 
+### Asset Styles (Protected - Requires JWT)
+
+#### Get Asset Styles
+```
+GET /api/asset-styles
+Authorization: Bearer <jwt_token>
+
+Response: 200 OK
+{
+  "assetStyles": [
+    {
+      "id": "style_id",
+      "name": "Growth Stocks",
+      "usageCount": 5
+    }
+  ]
+}
+```
+
+#### Create Asset Style
+```
+POST /api/asset-styles
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "name": "Tech Stocks"
+}
+
+Response: 201 Created
+```
+
+#### Update Portfolio Metadata
+```
+PUT /api/portfolios/:id/metadata
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "assetStyleId": "style_id",
+  "assetClass": "Stock"
+}
+
+Response: 200 OK
+```
+
 ### Analytics (Protected - Requires JWT)
 
 #### Get Dashboard Metrics
 ```
-GET /api/analytics/dashboard?currency=USD
+GET /api/analytics/dashboard?currency=USD&groupBy=assetStyle
 Authorization: Bearer <jwt_token>
 
 Query Parameters:
 - currency: USD or RMB (default: USD)
+- groupBy: assetStyle, assetClass, currency, or none (default: none)
 
-Response: 200 OK
+Response: 200 OK (Grouped)
 {
   "totalValue": 10000.00,
   "totalGain": 500.00,
   "percentageReturn": 5.00,
   "currency": "USD",
-  "allocation": [
+  "groupBy": "assetStyle",
+  "groups": [
+    {
+      "groupName": "Growth Stocks",
+      "groupValue": 6000.00,
+      "percentage": 60.00,
+      "holdings": [...]
+    }
+  ]
+}
+
+Response: 200 OK (Ungrouped)
+{
+  "totalValue": 10000.00,
+  "totalGain": 500.00,
+  "percentageReturn": 5.00,
+  "currency": "USD",
+  "holdings": [
     {
       "symbol": "AAPL",
-      "value": 5000.00,
-      "percentage": 50.00
+      "shares": 10.0,
+      "currentValue": 5000.00,
+      "assetStyleName": "Growth Stocks",
+      "assetClass": "Stock"
     }
   ]
 }
@@ -479,6 +556,87 @@ Response: 200 OK
   "timestamp": "2024-01-01T00:00:00Z"
 }
 ```
+
+## Using Dashboard Grouping
+
+The Dashboard Grouping feature allows you to organize and analyze your portfolio from different perspectives.
+
+### Asset Styles
+
+Asset Styles are custom labels you create to categorize your investments (e.g., "Growth Stocks", "Dividend Stocks", "Tech Sector").
+
+**Managing Asset Styles:**
+1. Navigate to the Asset Style Management page from the dashboard
+2. Create new styles by clicking "Add Asset Style"
+3. Edit or delete existing styles (portfolios will be reassigned if style is in use)
+4. Each user starts with a "Default" style
+
+### Asset Classes
+
+Asset Classes are standard investment categories:
+- **Stock**: Individual company stocks
+- **ETF**: Exchange-Traded Funds
+- **Bond**: Fixed-income securities
+- **Cash and Equivalents**: Money market funds, savings
+
+### First-Time Setup
+
+When you add your first transaction for a new stock:
+1. The system prompts you to classify the asset
+2. Select an Asset Style from your list (or create a new one)
+3. Select an Asset Class from the standard options
+4. Future transactions for the same stock automatically use these settings
+
+### Viewing Grouped Data
+
+On the Dashboard page, use the grouping selector to switch between views:
+
+**Group by Asset Style**: See your holdings organized by your custom styles
+```
+Growth Stocks (60%)
+├─ AAPL: $15,000
+└─ MSFT: $15,000
+
+Value Stocks (40%)
+└─ BRK.B: $20,000
+```
+
+**Group by Asset Class**: View standard asset allocation
+```
+Stock (70%)
+├─ AAPL: $15,000
+├─ MSFT: $15,000
+└─ BRK.B: $20,000
+
+ETF (30%)
+└─ VOO: $15,000
+```
+
+**Group by Currency**: Separate USD and RMB holdings
+```
+USD (80%)
+├─ AAPL: $15,000
+└─ MSFT: $15,000
+
+RMB (20%)
+└─ 600000.SS: ¥72,000 ($10,000)
+```
+
+**Individual Holdings**: Traditional flat list view
+
+### Editing Classifications
+
+You can change an asset's classification at any time:
+1. Click the edit icon next to any holding
+2. Select a new Asset Style or Asset Class
+3. The dashboard and charts update immediately
+
+### Visual Analytics
+
+The pie chart automatically adapts to your selected grouping mode, showing:
+- Percentage breakdown by group
+- Color-coded segments
+- Hover details with values and percentages
 
 ## Development
 
@@ -675,6 +833,13 @@ If you encounter issues not covered here:
    - Error message and stack trace
    - Steps to reproduce
    - Environment details (OS, Go version, Node version)
+
+## Documentation
+
+- **[API Documentation](API_DOCUMENTATION.md)**: Complete API reference for all endpoints
+- **[User Guide: Dashboard Grouping](USER_GUIDE_GROUPING.md)**: How to use the dashboard grouping feature
+- **[Deployment Guide](DEPLOYMENT.md)**: Production deployment instructions
+- **[Migration Plan](MIGRATION_PLAN.md)**: Data migration guide for dashboard grouping feature
 
 ## Deployment
 

@@ -299,6 +299,43 @@ If you prefer Netlify over Vercel:
 
 ## Post-Deployment
 
+### Run Data Migration (Dashboard Grouping Feature)
+
+If you're deploying the dashboard grouping feature for the first time, you need to run a data migration:
+
+**Important**: This migration adds asset classification metadata to existing portfolios.
+
+1. **Backup your database** before running migration:
+   ```bash
+   # For MongoDB Atlas, use the Atlas UI to create a snapshot
+   # For local MongoDB:
+   mongodump --uri="your-mongodb-uri" --out=/backup/pre-grouping-migration
+   ```
+
+2. **The migration runs automatically** on application startup
+   - Creates a "Default" asset style for each user
+   - Updates all portfolios with `assetStyleId` and `assetClass` fields
+   - Sets default values: assetClass = "Stock"
+
+3. **Verify migration success**:
+   ```bash
+   # Check application logs for:
+   # "Running migration: add_asset_metadata"
+   # "Migration completed successfully"
+   ```
+
+4. **Manual verification** (optional):
+   ```javascript
+   // In MongoDB shell
+   db.asset_styles.countDocuments({ name: "Default" })
+   // Should equal number of users
+   
+   db.portfolios.countDocuments({ asset_style_id: { $exists: true } })
+   // Should equal total portfolios
+   ```
+
+For detailed migration instructions, see [MIGRATION_PLAN.md](MIGRATION_PLAN.md)
+
 ### Update CORS Origin
 
 After deploying frontend, update backend CORS_ORIGIN:

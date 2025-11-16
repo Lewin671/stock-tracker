@@ -4,6 +4,8 @@ import axiosInstance from '../api/axios';
 import { Search, Loader2, TrendingUp, AlertCircle } from 'lucide-react';
 import Layout from '../components/Layout';
 import TransactionDialog from '../components/TransactionDialog';
+import { useToast } from '../contexts/ToastContext';
+import { formatErrorMessage } from '../utils/errorHandler';
 
 interface StockSearchResult {
   symbol: string;
@@ -15,6 +17,7 @@ interface StockSearchResult {
 
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
+  const { showError } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<StockSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,9 +42,12 @@ const SearchPage: React.FC = () => {
     } catch (err: any) {
       setSearchResults(null);
       if (err.status === 404) {
-        setError(`Stock symbol "${query.toUpperCase()}" not found`);
+        const errorMessage = `Stock symbol "${query.toUpperCase()}" not found`;
+        setError(errorMessage);
       } else {
-        setError(err.message || 'Failed to search stock');
+        const errorMessage = formatErrorMessage(err);
+        setError(errorMessage);
+        showError('Search failed', errorMessage);
       }
     } finally {
       setLoading(false);

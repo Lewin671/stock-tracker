@@ -25,4 +25,13 @@ func SetupPortfolioRoutes(router *gin.Engine, portfolioService *services.Portfol
 		portfolioGroup.DELETE("/transactions/:id", portfolioHandler.DeleteTransaction)
 		portfolioGroup.GET("/transactions/:symbol", portfolioHandler.GetTransactionsBySymbol)
 	}
+
+	// Portfolios routes group - all protected
+	portfoliosGroup := router.Group("/api/portfolios")
+	portfoliosGroup.Use(middleware.AuthMiddleware(authService))
+	{
+		portfoliosGroup.GET("/:id", portfolioHandler.GetPortfolio)
+		portfoliosGroup.PUT("/:id/metadata", portfolioHandler.UpdatePortfolioMetadata)
+		portfoliosGroup.GET("/check/:symbol", portfolioHandler.CheckPortfolio)
+	}
 }

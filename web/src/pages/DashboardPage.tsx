@@ -1,47 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import axiosInstance from '../api/axios';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import PortfolioSummaryCard from '../components/PortfolioSummaryCard';
 import AllocationPieChart from '../components/AllocationPieChart';
 import HistoricalPerformanceChart from '../components/HistoricalPerformanceChart';
-
-interface DashboardMetrics {
-  totalValue: number;
-  totalGain: number;
-  percentageReturn: number;
-  allocation: AllocationItem[];
-  currency: string;
-}
-
-interface AllocationItem {
-  symbol: string;
-  value: number;
-  percentage: number;
-}
+import GroupedHoldingsView from '../components/GroupedHoldingsView';
+import {
+  getDashboardMetrics,
+  isGroupedMetrics,
+  DashboardMetrics,
+  GroupedDashboardMetrics,
+  GroupingMode,
+} from '../api/analytics';
+import { loadGroupingMode, saveGroupingMode } from '../utils/groupingMode';
+import { useToast } from '../contexts/ToastContext';
+import { formatErrorMessage } from '../utils/errorHandler';
 
 const DashboardPage: React.FC = () => {
+  const { showError } = useToast();
   const [currency, setCurrency] = useState<'USD' | 'RMB'>('USD');
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [groupingMode, setGroupingMode] = useState<GroupingMode>(() => loadGroupingMode());
+  const [metrics, setMetrics] = useState<DashboardMetrics | GroupedDashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboardMetrics();
-  }, [currency]);
+  }, [currency, groupingMode]);
 
   const fetchDashboardMetrics = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await axiosInstance.get('/api/analytics/dashboard', {
-        params: { currency },
-      });
-      setMetrics(response.data);
+      const data = await getDashboardMetrics(currency, groupingMode);
+      setMetrics(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard metrics');
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      showError('Failed to load dashboard', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -53,33 +51,89 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleGroupingModeChange = (value: string) => {
+    if (value && ['assetStyle', 'assetClass', 'currency', 'none'].includes(value)) {
+      const newMode = value as GroupingMode;
+      setGroupingMode(newMode);
+      saveGroupingMode(newMode);
+    }
+  };
+
+  const handleViewTransactions = (symbol: string) => {
+    // Navigate to holdings page with symbol filter
+    window.location.href = `/holdings?symbol=${symbol}`;
+  };
+
+  const handleEditAsset = (portfolioId: string, symbol: string) => {
+    // This will be implemented when EditAssetMetadataDialog is integrated
+    console.log('Edit asset:', portfolioId, symbol);
+  };
+
   return (
     <Layout>
       {/* Page Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portfolio Dashboard</h1>
-            {/* Currency Toggle */}
-            <ToggleGroup.Root
-              type="single"
-              value={currency}
-              onValueChange={handleCurrencyChange}
-              className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1"
-            >
-              <ToggleGroup.Item
-                value="USD"
-                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Portfolio Dashboard</h1>
+              {/* Currency Toggle */}
+              <ToggleGroup.Root
+                type="single"
+                value={currency}
+                onValueChange={handleCurrencyChange}
+                className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1"
               >
-                USD
-              </ToggleGroup.Item>
-              <ToggleGroup.Item
-                value="RMB"
-                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
+                <ToggleGroup.Item
+                  value="USD"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
+                >
+                  USD
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="RMB"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
+                >
+                  RMB
+                </ToggleGroup.Item>
+              </ToggleGroup.Root>
+            </div>
+
+            {/* Grouping Mode Selector */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Group by:</span>
+              <ToggleGroup.Root
+                type="single"
+                value={groupingMode}
+                onValueChange={handleGroupingModeChange}
+                className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 flex-wrap gap-1"
               >
-                RMB
-              </ToggleGroup.Item>
-            </ToggleGroup.Root>
+                <ToggleGroup.Item
+                  value="none"
+                  className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white whitespace-nowrap"
+                >
+                  Individual
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="assetStyle"
+                  className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white whitespace-nowrap"
+                >
+                  Style
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="assetClass"
+                  className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white whitespace-nowrap"
+                >
+                  Class
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="currency"
+                  className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white whitespace-nowrap"
+                >
+                  Currency
+                </ToggleGroup.Item>
+              </ToggleGroup.Root>
+            </div>
           </div>
         </div>
       </div>
@@ -101,28 +155,73 @@ const DashboardPage: React.FC = () => {
             </button>
           </div>
         ) : metrics ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             {/* Portfolio Summary */}
-            <div className="lg:col-span-2">
-              <PortfolioSummaryCard
-                totalValue={metrics.totalValue}
-                totalGain={metrics.totalGain}
-                percentageReturn={metrics.percentageReturn}
-                currency={currency}
-              />
-            </div>
+            <PortfolioSummaryCard
+              totalValue={metrics.totalValue}
+              totalGain={metrics.totalGain}
+              percentageReturn={metrics.percentageReturn}
+              currency={currency}
+            />
 
-            {/* Allocation Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Portfolio Allocation</h2>
-              <AllocationPieChart data={metrics.allocation} />
-            </div>
+            {isGroupedMetrics(metrics) ? (
+              /* Grouped View */
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Allocation Chart for Grouped Data */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      {groupingMode === 'assetStyle' && 'Allocation by Asset Style'}
+                      {groupingMode === 'assetClass' && 'Allocation by Asset Class'}
+                      {groupingMode === 'currency' && 'Allocation by Currency'}
+                    </h2>
+                    <AllocationPieChart
+                      data={metrics.groups.map(g => ({
+                        symbol: g.groupName,
+                        value: g.groupValue,
+                        percentage: g.percentage,
+                      }))}
+                      groupingMode={groupingMode}
+                      currency={currency}
+                    />
+                  </div>
 
-            {/* Historical Performance Chart */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historical Performance</h2>
-              <HistoricalPerformanceChart currency={currency} />
-            </div>
+                  {/* Historical Performance Chart */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historical Performance</h2>
+                    <HistoricalPerformanceChart currency={currency} />
+                  </div>
+                </div>
+
+                {/* Grouped Holdings */}
+                <GroupedHoldingsView
+                  groups={metrics.groups}
+                  currency={currency}
+                  groupingMode={groupingMode}
+                  onViewTransactions={handleViewTransactions}
+                  onEditAsset={handleEditAsset}
+                />
+              </>
+            ) : (
+              /* Individual Holdings View */
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Allocation Chart */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Portfolio Allocation</h2>
+                  <AllocationPieChart 
+                    data={metrics.allocation} 
+                    groupingMode="none"
+                    currency={currency}
+                  />
+                </div>
+
+                {/* Historical Performance Chart */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historical Performance</h2>
+                  <HistoricalPerformanceChart currency={currency} />
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
       </main>

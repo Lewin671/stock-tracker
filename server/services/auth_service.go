@@ -81,6 +81,14 @@ func (s *AuthService) Register(email, password string) (*models.User, error) {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
+	// Create default asset style for new user
+	assetStyleService := NewAssetStyleService()
+	_, err = assetStyleService.CreateDefaultAssetStyle(user.ID)
+	if err != nil {
+		// Log error but don't fail user creation
+		fmt.Printf("Warning: Failed to create default asset style for user %s: %v\n", user.ID.Hex(), err)
+	}
+
 	return user, nil
 }
 

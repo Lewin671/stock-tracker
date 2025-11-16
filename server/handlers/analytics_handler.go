@@ -60,7 +60,48 @@ func (h *AnalyticsHandler) GetDashboard(c *gin.Context) {
 		return
 	}
 
-	// Get dashboard metrics
+	// Get groupBy parameter (optional)
+	groupBy := c.DefaultQuery("groupBy", "none")
+
+	// Validate groupBy parameter
+	validGroupBy := map[string]bool{
+		"assetStyle": true,
+		"assetClass": true,
+		"currency":   true,
+		"none":       true,
+	}
+
+	if !validGroupBy[groupBy] {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid groupBy parameter. Must be assetStyle, assetClass, currency, or none",
+			},
+		})
+		return
+	}
+
+	// If groupBy is specified and not "none", use grouped metrics
+	if groupBy != "none" {
+		groupedMetrics, err := h.analyticsService.GetGroupedDashboardMetrics(userID, currency, groupBy)
+		if err != nil {
+			// Log the detailed error for debugging
+			fmt.Printf("Error fetching grouped dashboard metrics for user %s: %v\n", userID.Hex(), err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": gin.H{
+					"code":    "INTERNAL_SERVER_ERROR",
+					"message": "Failed to fetch dashboard metrics",
+					"details": err.Error(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, groupedMetrics)
+		return
+	}
+
+	// Get dashboard metrics (ungrouped)
 	metrics, err := h.analyticsService.GetDashboardMetrics(userID, currency)
 	if err != nil {
 		// Log the detailed error for debugging

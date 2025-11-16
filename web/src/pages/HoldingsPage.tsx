@@ -6,6 +6,10 @@ import Layout from '../components/Layout';
 import HoldingsTable from '../components/HoldingsTable';
 import TransactionDialog from '../components/TransactionDialog';
 import TransactionsList from '../components/TransactionsList';
+import EditAssetMetadataDialog from '../components/EditAssetMetadataDialog';
+import { getPortfolio, updatePortfolioMetadata, Portfolio } from '../api/portfolios';
+import { useToast } from '../contexts/ToastContext';
+import { formatErrorMessage } from '../utils/errorHandler';
 
 interface Holding {
   symbol: string;
@@ -16,6 +20,7 @@ interface Holding {
   gainLoss: number;
   gainLossPercent: number;
   currency: string;
+  portfolioId?: string;
 }
 
 interface Transaction {
@@ -30,6 +35,7 @@ interface Transaction {
 }
 
 const HoldingsPage: React.FC = () => {
+  const { showSuccess, showError } = useToast();
   const [currency, setCurrency] = useState<'USD' | 'RMB'>('USD');
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +46,8 @@ const HoldingsPage: React.FC = () => {
   const [transactionsListOpen, setTransactionsListOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | undefined>(undefined);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
+  const [editMetadataDialogOpen, setEditMetadataDialogOpen] = useState(false);
+  const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
 
   useEffect(() => {
     fetchHoldings();
@@ -92,6 +100,50 @@ const HoldingsPage: React.FC = () => {
 
   const handleTransactionDeleted = () => {
     fetchHoldings();
+  };
+
+  const handleEditAsset = async (portfolioId: string, symbol: string) => {
+    try {
+      const portfolio = await getPortfolio(portfolioId);
+      setEditingPortfolio(portfolio);
+      setEditMetadataDialogOpen(true);
+    } catch (err: any) {
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      showError('Failed to load portfolio', errorMessage);
+    }
+  };
+
+  const handleSaveMetadata = async (assetStyleId: string, assetClass: string) => {
+    if (!editingPortfolio) return;
+    
+    // Validate assetClass is one of the allowed values
+    const validAssetClasses = ['Stock', 'ETF', 'Bond', 'Cash and Equivalents'];
+    if (!validAssetClasses.includes(assetClass)) {
+      showError('Invalid asset class', 'Please select a valid asset class');
+      return;
+    }
+    
+    try {
+      await updatePortfolioMetadata(
+        editingPortfolio.id, 
+        assetStyleId, 
+        assetClass as 'Stock' | 'ETF' | 'Bond' | 'Cash and Equivalents'
+      );
+      setEditMetadataDialogOpen(false);
+      setEditingPortfolio(null);
+      fetchHoldings();
+      showSuccess('Asset updated', `Classification for ${editingPortfolio.symbol} has been updated`);
+    } catch (err: any) {
+      const errorMessage = formatErrorMessage(err);
+      showError('Failed to update asset', errorMessage);
+      throw err; // Re-throw so the dialog can handle it
+    }
+  };
+
+  const handleCancelEditMetadata = () => {
+    setEditMetadataDialogOpen(false);
+    setEditingPortfolio(null);
   };
 
   return (
@@ -167,6 +219,7 @@ const HoldingsPage: React.FC = () => {
                   holdings={holdings}
                   currency={currency}
                   onViewTransactions={handleViewTransactions}
+                  onEditAsset={handleEditAsset}
                 />
               </div>
             )}
@@ -199,6 +252,14 @@ const HoldingsPage: React.FC = () => {
             onTransactionDeleted={handleTransactionDeleted}
           />
         )}
+
+        {/* Edit Asset Metadata Dialog */}
+        <EditAssetMetadataDialog
+          open={editMetadataDialogOpen}
+          portfolio={editingPortfolio}
+          onSave={handleSaveMetadata}
+          onCancel={handleCancelEditMetadata}
+        />
       </main>
     </Layout>
   );

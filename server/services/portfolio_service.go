@@ -23,6 +23,7 @@ var (
 
 // Holding represents a calculated portfolio holding
 type Holding struct {
+	PortfolioID     string  `json:"portfolioId,omitempty"`
 	Symbol          string  `json:"symbol"`
 	Shares          float64 `json:"shares"`
 	CostBasis       float64 `json:"costBasis"`
@@ -316,6 +317,27 @@ func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID, targetCurr
 	
 	fmt.Printf("[Portfolio] Found %d transactions for user %s\n", len(transactions), userID.Hex())
 
+	// Fetch all portfolios for the user to get portfolio IDs
+	portfolioCollection := database.Database.Collection("portfolios")
+	portfolioCursor, err := portfolioCollection.Find(ctx, bson.M{"user_id": userID})
+	if err != nil {
+		fmt.Printf("[Portfolio] ERROR: Failed to fetch portfolios for user %s: %v\n", userID.Hex(), err)
+		return nil, fmt.Errorf("failed to fetch portfolios: %w", err)
+	}
+	defer portfolioCursor.Close(ctx)
+
+	var portfolios []models.Portfolio
+	if err := portfolioCursor.All(ctx, &portfolios); err != nil {
+		fmt.Printf("[Portfolio] ERROR: Failed to decode portfolios for user %s: %v\n", userID.Hex(), err)
+		return nil, fmt.Errorf("failed to decode portfolios: %w", err)
+	}
+
+	// Create a map of symbol to portfolio ID
+	symbolToPortfolioID := make(map[string]string)
+	for _, p := range portfolios {
+		symbolToPortfolioID[p.Symbol] = p.ID.Hex()
+	}
+
 	// Group transactions by symbol
 	symbolTransactions := make(map[string][]models.Transaction)
 	for _, tx := range transactions {
@@ -333,6 +355,11 @@ func (s *PortfolioService) GetUserHoldings(userID primitive.ObjectID, targetCurr
 			// Log error but continue with other holdings
 			fmt.Printf("[Portfolio] ERROR: Failed to calculate holding for %s: %v\n", symbol, err)
 			continue
+		}
+
+		// Add portfolio ID if available
+		if portfolioID, exists := symbolToPortfolioID[symbol]; exists {
+			holding.PortfolioID = portfolioID
 		}
 
 		// Filter out holdings with zero shares
@@ -468,4 +495,175 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 		GainLossPercent: gainLossPercent,
 		Currency:        targetCurrency,
 	}, nil
+}
+
+// UpdatePortfolioMetadata updates the asset style and asset class of a portfolio
+func (s *PortfolioService) UpdatePortfolioMetadata(userID primitive.ObjectID, portfolioID primitive.ObjectID, assetStyleID primitive.ObjectID, assetClass string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := database.Database.Collection("portfolios")
+
+	// Validate asset class
+	validAssetClasses := map[string]bool{
+		"Stock":                 true,
+		"ETF":                   true,
+		"Bond":                  true,
+		"Cash and Equivalents": true,
+	}
+
+	if !validAssetClasses[assetClass] {
+		return fmt.Errorf("%w: invalid asset class", ErrInvalidTransaction)
+	}
+
+	// Update portfolio
+	update := bson.M{
+		"$set": bson.M{
+			"asset_style_id": assetStyleID,
+			"asset_class":    assetClass,
+			"updated_at":     time.Now(),
+		},
+	}
+
+	result, err := collection.UpdateOne(ctx, bson.M{
+		"_id":     portfolioID,
+		"user_id": userID,
+	}, update)
+
+	if err != nil {
+		return fmt.Errorf("failed to update portfolio metadata: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("portfolio not found")
+	}
+
+	return nil
+}
+
+// GetPortfolioWithMetadata returns portfolio with asset style and asset class
+func (s *PortfolioService) GetPortfolioWithMetadata(userID primitive.ObjectID, portfolioID primitive.ObjectID) (*models.Portfolio, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := database.Database.Collection("portfolios")
+
+	var portfolio models.Portfolio
+	err := collection.FindOne(ctx, bson.M{
+		"_id":     portfolioID,
+		"user_id": userID,
+	}).Decode(&portfolio)
+
+	if err == mongo.ErrNoDocuments {
+		return nil, fmt.Errorf("portfolio not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch portfolio: %w", err)
+	}
+
+	return &portfolio, nil
+}
+
+// CheckPortfolioExists checks if a portfolio exists for a symbol
+func (s *PortfolioService) CheckPortfolioExists(userID primitive.ObjectID, symbol string) (bool, *models.Portfolio, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := database.Database.Collection("portfolios")
+
+	var portfolio models.Portfolio
+	err := collection.FindOne(ctx, bson.M{
+		"user_id": userID,
+		"symbol":  symbol,
+	}).Decode(&portfolio)
+
+	if err == mongo.ErrNoDocuments {
+		return false, nil, nil
+	}
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to check portfolio: %w", err)
+	}
+
+	return true, &portfolio, nil
+}
+
+// GetPortfolioBySymbol returns a portfolio by symbol
+func (s *PortfolioService) GetPortfolioBySymbol(userID primitive.ObjectID, symbol string) (*models.Portfolio, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := database.Database.Collection("portfolios")
+
+	var portfolio models.Portfolio
+	err := collection.FindOne(ctx, bson.M{
+		"user_id": userID,
+		"symbol":  symbol,
+	}).Decode(&portfolio)
+
+	if err == mongo.ErrNoDocuments {
+		return nil, fmt.Errorf("portfolio not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch portfolio: %w", err)
+	}
+
+	return &portfolio, nil
+}
+
+// CreatePortfolioWithMetadata creates a new portfolio with asset style and asset class
+func (s *PortfolioService) CreatePortfolioWithMetadata(userID primitive.ObjectID, symbol string, assetStyleID primitive.ObjectID, assetClass string) (primitive.ObjectID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := database.Database.Collection("portfolios")
+
+	// Check if portfolio already exists
+	var existing models.Portfolio
+	err := collection.FindOne(ctx, bson.M{
+		"user_id": userID,
+		"symbol":  symbol,
+	}).Decode(&existing)
+
+	if err == nil {
+		// Portfolio already exists, update its metadata
+		err = s.UpdatePortfolioMetadata(userID, existing.ID, assetStyleID, assetClass)
+		if err != nil {
+			return primitive.NilObjectID, err
+		}
+		return existing.ID, nil
+	}
+
+	if err != mongo.ErrNoDocuments {
+		return primitive.NilObjectID, fmt.Errorf("failed to query portfolio: %w", err)
+	}
+
+	// Validate asset class
+	validAssetClasses := map[string]bool{
+		"Stock":                 true,
+		"ETF":                   true,
+		"Bond":                  true,
+		"Cash and Equivalents": true,
+	}
+
+	if !validAssetClasses[assetClass] {
+		return primitive.NilObjectID, fmt.Errorf("invalid asset class")
+	}
+
+	// Create new portfolio with metadata
+	portfolio := models.Portfolio{
+		ID:           primitive.NewObjectID(),
+		UserID:       userID,
+		Symbol:       symbol,
+		AssetStyleID: &assetStyleID,
+		AssetClass:   assetClass,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	_, err = collection.InsertOne(ctx, portfolio)
+	if err != nil {
+		return primitive.NilObjectID, fmt.Errorf("failed to create portfolio: %w", err)
+	}
+
+	return portfolio.ID, nil
 }

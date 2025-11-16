@@ -1,6 +1,7 @@
 import React from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { getGroupColors, getAssetClassIcon } from '../utils/assetClassColors';
 
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -13,22 +14,20 @@ interface AllocationItem {
 
 interface AllocationPieChartProps {
   data: AllocationItem[];
+  groupingMode?: 'assetStyle' | 'assetClass' | 'currency' | 'none';
+  currency?: string;
 }
 
-const AllocationPieChart: React.FC<AllocationPieChartProps> = ({ data }) => {
-  // Generate colors for each holding
-  const colors = [
-    '#3B82F6', // blue-500
-    '#10B981', // green-500
-    '#F59E0B', // amber-500
-    '#EF4444', // red-500
-    '#8B5CF6', // violet-500
-    '#EC4899', // pink-500
-    '#14B8A6', // teal-500
-    '#F97316', // orange-500
-    '#6366F1', // indigo-500
-    '#84CC16', // lime-500
-  ];
+const AllocationPieChart: React.FC<AllocationPieChartProps> = ({ 
+  data, 
+  groupingMode = 'none',
+  currency = 'USD'
+}) => {
+  // Generate colors based on grouping mode
+  const colors = getGroupColors(
+    data.map(item => item.symbol),
+    groupingMode
+  );
 
   const chartData = {
     labels: data.map((item) => item.symbol),
@@ -53,14 +52,17 @@ const AllocationPieChart: React.FC<AllocationPieChartProps> = ({ data }) => {
           font: {
             size: 12,
           },
+          color: '#e5e7eb',
           generateLabels: (chart: any) => {
             const datasets = chart.data.datasets;
             return chart.data.labels.map((label: string, i: number) => {
-              const value = datasets[0].data[i];
               const percentage = data[i].percentage;
+              // Add icon for Asset Class grouping
+              const icon = groupingMode === 'assetClass' ? `${getAssetClassIcon(label)} ` : '';
               return {
-                text: `${label} (${percentage.toFixed(1)}%)`,
+                text: `${icon}${label} (${percentage.toFixed(1)}%)`,
                 fillStyle: datasets[0].backgroundColor[i],
+                fontColor: '#e5e7eb',
                 hidden: false,
                 index: i,
               };
@@ -69,15 +71,23 @@ const AllocationPieChart: React.FC<AllocationPieChartProps> = ({ data }) => {
         },
       },
       tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        titleColor: '#1f2937',
+        bodyColor: '#1f2937',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        padding: 12,
         callbacks: {
           label: (context: any) => {
             const label = context.label || '';
             const value = context.parsed || 0;
             const percentage = data[context.dataIndex].percentage;
-            return `${label}: ${value.toLocaleString('en-US', {
+            const icon = groupingMode === 'assetClass' ? `${getAssetClassIcon(label)} ` : '';
+            const formattedValue = value.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
-            })} (${percentage.toFixed(1)}%)`;
+            });
+            return `${icon}${label}: ${currency === 'RMB' ? '¥' : '$'}${formattedValue} (${percentage.toFixed(1)}%)`;
           },
         },
       },

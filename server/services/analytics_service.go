@@ -34,6 +34,24 @@ type PerformanceDataPoint struct {
 	Value float64   `json:"value"`
 }
 
+// GroupedHolding represents holdings grouped by a dimension
+type GroupedHolding struct {
+	GroupName   string    `json:"groupName"`
+	GroupValue  float64   `json:"groupValue"`
+	Percentage  float64   `json:"percentage"`
+	Holdings    []Holding `json:"holdings"`
+}
+
+// GroupedDashboardMetrics represents dashboard metrics grouped by specified dimension
+type GroupedDashboardMetrics struct {
+	TotalValue       float64          `json:"totalValue"`
+	TotalGain        float64          `json:"totalGain"`
+	PercentageReturn float64          `json:"percentageReturn"`
+	Groups           []GroupedHolding `json:"groups"`
+	Currency         string           `json:"currency"`
+	GroupBy          string           `json:"groupBy"`
+}
+
 // AnalyticsService handles analytics and performance calculations
 type AnalyticsService struct {
 	portfolioService *PortfolioService
@@ -335,4 +353,254 @@ func (s *AnalyticsService) findPriceForDate(prices []HistoricalPrice, targetDate
 	}
 	
 	return closestPrice
+}
+
+// GetGroupedDashboardMetrics returns dashboard metrics grouped by specified dimension
+// Optimized version using efficient data fetching and in-memory grouping
+func (s *AnalyticsService) GetGroupedDashboardMetrics(userID primitive.ObjectID, currency string, groupBy string) (*GroupedDashboardMetrics, error) {
+	fmt.Printf("[Analytics] GetGroupedDashboardMetrics called - UserID: %s, Currency: %s, GroupBy: %s\n", userID.Hex(), currency, groupBy)
+
+	// Validate currency
+	if currency != "USD" && currency != "RMB" && currency != "CNY" {
+		return nil, fmt.Errorf("invalid currency: must be USD or RMB")
+	}
+
+	// Normalize CNY to RMB
+	if currency == "CNY" {
+		currency = "RMB"
+	}
+
+	// Validate groupBy parameter
+	validGroupBy := map[string]bool{
+		"assetStyle": true,
+		"assetClass": true,
+		"currency":   true,
+		"none":       true,
+	}
+
+	if !validGroupBy[groupBy] {
+		return nil, fmt.Errorf("invalid groupBy parameter: must be assetStyle, assetClass, currency, or none")
+	}
+
+	// Fetch user holdings (already optimized with proper indexes)
+	holdings, err := s.portfolioService.GetUserHoldings(userID, currency)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch holdings: %w", err)
+	}
+
+	// If no holdings, return empty metrics
+	if len(holdings) == 0 {
+		return &GroupedDashboardMetrics{
+			TotalValue:       0,
+			TotalGain:        0,
+			PercentageReturn: 0,
+			Groups:           []GroupedHolding{},
+			Currency:         currency,
+			GroupBy:          groupBy,
+		}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Fetch portfolios and asset styles in parallel for better performance
+	type portfolioResult struct {
+		portfolios []models.Portfolio
+		err        error
+	}
+	type assetStyleResult struct {
+		assetStyles []models.AssetStyle
+		err         error
+	}
+
+	portfolioChan := make(chan portfolioResult, 1)
+	assetStyleChan := make(chan assetStyleResult, 1)
+
+	// Fetch portfolios in goroutine
+	go func() {
+		portfolioCollection := database.Database.Collection("portfolios")
+		cursor, err := portfolioCollection.Find(ctx, bson.M{"user_id": userID})
+		if err != nil {
+			portfolioChan <- portfolioResult{err: err}
+			return
+		}
+		defer cursor.Close(ctx)
+
+		var portfolios []models.Portfolio
+		if err := cursor.All(ctx, &portfolios); err != nil {
+			portfolioChan <- portfolioResult{err: err}
+			return
+		}
+		portfolioChan <- portfolioResult{portfolios: portfolios}
+	}()
+
+	// Fetch asset styles in goroutine
+	go func() {
+		assetStyleCollection := database.Database.Collection("asset_styles")
+		cursor, err := assetStyleCollection.Find(ctx, bson.M{"user_id": userID})
+		if err != nil {
+			assetStyleChan <- assetStyleResult{err: err}
+			return
+		}
+		defer cursor.Close(ctx)
+
+		var assetStyles []models.AssetStyle
+		if err := cursor.All(ctx, &assetStyles); err != nil {
+			assetStyleChan <- assetStyleResult{err: err}
+			return
+		}
+		assetStyleChan <- assetStyleResult{assetStyles: assetStyles}
+	}()
+
+	// Wait for both results
+	portfolioRes := <-portfolioChan
+	assetStyleRes := <-assetStyleChan
+
+	if portfolioRes.err != nil {
+		return nil, fmt.Errorf("failed to fetch portfolios: %w", portfolioRes.err)
+	}
+	if assetStyleRes.err != nil {
+		return nil, fmt.Errorf("failed to fetch asset styles: %w", assetStyleRes.err)
+	}
+
+	// Create lookup maps with pre-allocated capacity
+	portfolioMap := make(map[string]*models.Portfolio, len(portfolioRes.portfolios))
+	for i := range portfolioRes.portfolios {
+		portfolioMap[portfolioRes.portfolios[i].Symbol] = &portfolioRes.portfolios[i]
+	}
+
+	assetStyleMap := make(map[primitive.ObjectID]string, len(assetStyleRes.assetStyles))
+	for _, style := range assetStyleRes.assetStyles {
+		assetStyleMap[style.ID] = style.Name
+	}
+
+	// Group holdings based on groupBy parameter
+	var groups map[string][]Holding
+
+	switch groupBy {
+	case "assetStyle":
+		groups = s.groupByAssetStyle(holdings, portfolioMap, assetStyleMap)
+	case "assetClass":
+		groups = s.groupByAssetClass(holdings, portfolioMap)
+	case "currency":
+		groups = s.groupByCurrency(holdings, portfolioMap)
+	case "none":
+		// No grouping, return all holdings in a single group
+		groups = map[string][]Holding{"All Holdings": holdings}
+	}
+
+	// Calculate totals and group metrics in a single pass
+	var totalValue float64
+	var totalCostBasis float64
+	groupedHoldings := make([]GroupedHolding, 0, len(groups))
+
+	for groupName, groupHoldings := range groups {
+		var groupValue float64
+		for _, holding := range groupHoldings {
+			groupValue += holding.CurrentValue
+			totalValue += holding.CurrentValue
+			totalCostBasis += holding.CostBasis
+		}
+
+		groupedHoldings = append(groupedHoldings, GroupedHolding{
+			GroupName:  groupName,
+			GroupValue: groupValue,
+			Percentage: 0, // Will calculate after we have totalValue
+			Holdings:   groupHoldings,
+		})
+	}
+
+	// Calculate percentages in a second pass
+	for i := range groupedHoldings {
+		if totalValue > 0 {
+			groupedHoldings[i].Percentage = (groupedHoldings[i].GroupValue / totalValue) * 100
+		}
+	}
+
+	// Sort groups by value (descending)
+	sort.Slice(groupedHoldings, func(i, j int) bool {
+		return groupedHoldings[i].GroupValue > groupedHoldings[j].GroupValue
+	})
+
+	// Calculate total gain and percentage return
+	totalGain := totalValue - totalCostBasis
+	percentageReturn := 0.0
+	if totalCostBasis > 0 {
+		percentageReturn = (totalGain / totalCostBasis) * 100
+	}
+
+	return &GroupedDashboardMetrics{
+		TotalValue:       totalValue,
+		TotalGain:        totalGain,
+		PercentageReturn: percentageReturn,
+		Groups:           groupedHoldings,
+		Currency:         currency,
+		GroupBy:          groupBy,
+	}, nil
+}
+
+// groupByAssetStyle groups holdings by asset style
+func (s *AnalyticsService) groupByAssetStyle(holdings []Holding, portfolioMap map[string]*models.Portfolio, assetStyleMap map[primitive.ObjectID]string) map[string][]Holding {
+	groups := make(map[string][]Holding)
+
+	for _, holding := range holdings {
+		portfolio, exists := portfolioMap[holding.Symbol]
+		if !exists || portfolio.AssetStyleID == nil {
+			// No portfolio or no asset style, use "Uncategorized"
+			groups["Uncategorized"] = append(groups["Uncategorized"], holding)
+			continue
+		}
+
+		styleName, exists := assetStyleMap[*portfolio.AssetStyleID]
+		if !exists {
+			styleName = "Unknown"
+		}
+
+		groups[styleName] = append(groups[styleName], holding)
+	}
+
+	return groups
+}
+
+// groupByAssetClass groups holdings by asset class
+func (s *AnalyticsService) groupByAssetClass(holdings []Holding, portfolioMap map[string]*models.Portfolio) map[string][]Holding {
+	groups := make(map[string][]Holding)
+
+	for _, holding := range holdings {
+		portfolio, exists := portfolioMap[holding.Symbol]
+		if !exists || portfolio.AssetClass == "" {
+			// No portfolio or no asset class, use "Uncategorized"
+			groups["Uncategorized"] = append(groups["Uncategorized"], holding)
+			continue
+		}
+
+		groups[portfolio.AssetClass] = append(groups[portfolio.AssetClass], holding)
+	}
+
+	return groups
+}
+
+// groupByCurrency groups holdings by currency
+func (s *AnalyticsService) groupByCurrency(holdings []Holding, portfolioMap map[string]*models.Portfolio) map[string][]Holding {
+	groups := make(map[string][]Holding)
+
+	for _, holding := range holdings {
+		// Use the holding's currency (which is already converted to target currency)
+		// We need to determine the original currency from the portfolio
+		portfolio, exists := portfolioMap[holding.Symbol]
+		if !exists {
+			groups["Unknown"] = append(groups["Unknown"], holding)
+			continue
+		}
+
+		// Determine currency based on symbol (US stocks vs China stocks)
+		currency := "USD"
+		if s.stockService.IsChinaStock(portfolio.Symbol) {
+			currency = "RMB"
+		}
+
+		groups[currency] = append(groups[currency], holding)
+	}
+
+	return groups
 }

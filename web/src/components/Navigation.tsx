@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import * as Dialog from '@radix-ui/react-dialog';
-import { LayoutDashboard, Briefcase, Search, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Search, LogOut, Menu, X, Tag } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
 const Navigation: React.FC = () => {
@@ -20,6 +20,7 @@ const Navigation: React.FC = () => {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/holdings', label: 'Holdings', icon: Briefcase },
     { path: '/search', label: 'Search', icon: Search },
+    { path: '/asset-styles', label: 'Asset Styles', icon: Tag },
   ];
 
   const isActive = (path: string) => location.pathname === path;

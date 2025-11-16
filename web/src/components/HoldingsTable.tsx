@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye } from 'lucide-react';
+import { Eye, Edit2 } from 'lucide-react';
 
 interface Holding {
   symbol: string;
@@ -10,15 +10,17 @@ interface Holding {
   gainLoss: number;
   gainLossPercent: number;
   currency: string;
+  portfolioId?: string;
 }
 
 interface HoldingsTableProps {
   holdings: Holding[];
   currency: string;
   onViewTransactions: (symbol: string) => void;
+  onEditAsset?: (portfolioId: string, symbol: string) => void;
 }
 
-const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onViewTransactions }) => {
+const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onViewTransactions, onEditAsset }) => {
   const formatCurrency = (value: number, curr: string) => {
     const symbol = curr === 'USD' ? '$' : '¥';
     return `${symbol}${value.toFixed(2)}`;
@@ -89,13 +91,24 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right">
-                <button
-                  onClick={() => onViewTransactions(holding.symbol)}
-                  className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-                >
-                  <Eye className="h-4 w-4" />
-                  View
-                </button>
+                <div className="flex items-center justify-end gap-2">
+                  {onEditAsset && holding.portfolioId && (
+                    <button
+                      onClick={() => onEditAsset(holding.portfolioId!, holding.symbol)}
+                      className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+                      title="Edit classification"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onViewTransactions(holding.symbol)}
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -111,13 +124,24 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{holding.symbol}</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{holding.shares.toFixed(2)} shares</p>
               </div>
-              <button
-                onClick={() => onViewTransactions(holding.symbol)}
-                className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-              >
-                <Eye className="h-4 w-4" />
-                View
-              </button>
+              <div className="flex items-center gap-2">
+                {onEditAsset && holding.portfolioId && (
+                  <button
+                    onClick={() => onEditAsset(holding.portfolioId!, holding.symbol)}
+                    className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium"
+                    title="Edit classification"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => onViewTransactions(holding.symbol)}
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                >
+                  <Eye className="h-4 w-4" />
+                  View
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3 text-sm">

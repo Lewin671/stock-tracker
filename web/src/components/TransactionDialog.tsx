@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Loader2, DollarSign, Calendar, Hash, TrendingUp } from 'lucide-react';
 import axiosInstance from '../api/axios';
+import AssetClassDialog from './AssetClassDialog';
+import { checkPortfolioExists, updatePortfolioMetadata } from '../api/portfolios';
+import { useToast } from '../contexts/ToastContext';
+import { formatErrorMessage } from '../utils/errorHandler';
 
 interface Transaction {
   id: string;
@@ -39,6 +43,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
   symbol,
   transaction,
 }) => {
+  const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState<TransactionFormData>({
     symbol: symbol || '',
     action: 'buy',
@@ -51,6 +56,8 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showAssetClassDialog, setShowAssetClassDialog] = useState(false);
+  const [pendingTransaction, setPendingTransaction] = useState<any>(null);
 
   useEffect(() => {
     if (transaction) {
@@ -133,16 +140,30 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
       if (transaction) {
         // Update existing transaction
         await axiosInstance.put(`/api/portfolio/transactions/${transaction.id}`, payload);
+        showSuccess('Transaction updated', `${payload.symbol} transaction has been updated`);
+        onSuccess();
+        handleClose();
       } else {
-        // Add new transaction
-        await axiosInstance.post('/api/portfolio/transactions', payload);
+        // Check if portfolio exists for this symbol
+        const portfolioCheck = await checkPortfolioExists(payload.symbol);
+        
+        if (!portfolioCheck.exists) {
+          // Portfolio doesn't exist, show asset classification dialog
+          setPendingTransaction(payload);
+          setShowAssetClassDialog(true);
+          setLoading(false);
+        } else {
+          // Portfolio exists, proceed with transaction
+          await axiosInstance.post('/api/portfolio/transactions', payload);
+          showSuccess('Transaction added', `${payload.symbol} transaction has been added`);
+          onSuccess();
+          handleClose();
+        }
       }
-
-      onSuccess();
-      handleClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to save transaction');
-    } finally {
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      showError('Failed to save transaction', errorMessage);
       setLoading(false);
     }
   };
@@ -174,11 +195,58 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
     }
   };
 
+  const handleAssetClassSave = async (assetStyleId: string, assetClass: string) => {
+    if (!pendingTransaction) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // First, create the transaction which will create the portfolio
+      await axiosInstance.post('/api/portfolio/transactions', pendingTransaction);
+      
+      // Get the portfolio ID from the response or fetch it
+      const portfolioCheck = await checkPortfolioExists(pendingTransaction.symbol);
+      
+      if (portfolioCheck.exists && portfolioCheck.portfolio) {
+        // Update the portfolio metadata
+        await updatePortfolioMetadata(portfolioCheck.portfolio.id, assetStyleId, assetClass as any);
+      }
+
+      showSuccess('Transaction added', `${pendingTransaction.symbol} has been added with classification`);
+      setPendingTransaction(null);
+      setShowAssetClassDialog(false);
+      onSuccess();
+      handleClose();
+    } catch (err: any) {
+      const errorMessage = formatErrorMessage(err);
+      setError(errorMessage);
+      showError('Failed to save transaction', errorMessage);
+      setShowAssetClassDialog(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssetClassCancel = () => {
+    setShowAssetClassDialog(false);
+    setPendingTransaction(null);
+    setLoading(false);
+  };
+
   return (
-    <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+    <>
+      <AssetClassDialog
+        open={showAssetClassDialog}
+        symbol={pendingTransaction?.symbol || ''}
+        onSave={handleAssetClassSave}
+        onCancel={handleAssetClassCancel}
+      />
+      
+      <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -379,6 +447,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+    </>
   );
 };
 

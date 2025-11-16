@@ -394,3 +394,195 @@ func (h *PortfolioHandler) GetTransactionsBySymbol(c *gin.Context) {
 		"transactions": transactions,
 	})
 }
+
+// UpdatePortfolioMetadata updates the asset style and asset class of a portfolio
+func (h *PortfolioHandler) UpdatePortfolioMetadata(c *gin.Context) {
+	// Get user ID from context
+	userIDInterface, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":    "UNAUTHORIZED",
+				"message": "User not authenticated",
+			},
+		})
+		return
+	}
+
+	userID, ok := userIDInterface.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":    "INTERNAL_SERVER_ERROR",
+				"message": "Invalid user ID format",
+			},
+		})
+		return
+	}
+
+	// Get portfolio ID from URL
+	portfolioIDStr := c.Param("id")
+	portfolioID, err := primitive.ObjectIDFromHex(portfolioIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid portfolio ID",
+			},
+		})
+		return
+	}
+
+	// Parse request body
+	var req models.UpdatePortfolioMetadataRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid portfolio metadata",
+				"details": err.Error(),
+			},
+		})
+		return
+	}
+
+	// Convert asset style ID
+	assetStyleID, err := primitive.ObjectIDFromHex(req.AssetStyleID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid asset style ID",
+			},
+		})
+		return
+	}
+
+	// Update portfolio metadata
+	err = h.portfolioService.UpdatePortfolioMetadata(userID, portfolioID, assetStyleID, req.AssetClass)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":    "INTERNAL_SERVER_ERROR",
+				"message": "Failed to update portfolio metadata",
+				"details": err.Error(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Portfolio metadata updated successfully",
+	})
+}
+
+// GetPortfolio returns a portfolio by ID
+func (h *PortfolioHandler) GetPortfolio(c *gin.Context) {
+	// Get user ID from context
+	userIDInterface, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":    "UNAUTHORIZED",
+				"message": "User not authenticated",
+			},
+		})
+		return
+	}
+
+	userID, ok := userIDInterface.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":    "INTERNAL_SERVER_ERROR",
+				"message": "Invalid user ID format",
+			},
+		})
+		return
+	}
+
+	// Get portfolio ID from URL
+	portfolioIDStr := c.Param("id")
+	portfolioID, err := primitive.ObjectIDFromHex(portfolioIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid portfolio ID",
+			},
+		})
+		return
+	}
+
+	// Get portfolio
+	portfolio, err := h.portfolioService.GetPortfolioWithMetadata(userID, portfolioID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"code":    "NOT_FOUND",
+				"message": "Portfolio not found",
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"portfolio": portfolio,
+	})
+}
+
+// CheckPortfolio checks if a portfolio exists for a symbol
+func (h *PortfolioHandler) CheckPortfolio(c *gin.Context) {
+	// Get user ID from context
+	userIDInterface, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": gin.H{
+				"code":    "UNAUTHORIZED",
+				"message": "User not authenticated",
+			},
+		})
+		return
+	}
+
+	userID, ok := userIDInterface.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":    "INTERNAL_SERVER_ERROR",
+				"message": "Invalid user ID format",
+			},
+		})
+		return
+	}
+
+	// Get symbol from URL
+	symbol := c.Param("symbol")
+	if symbol == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "VALIDATION_ERROR",
+				"message": "Symbol is required",
+			},
+		})
+		return
+	}
+
+	// Check portfolio
+	exists, portfolio, err := h.portfolioService.CheckPortfolioExists(userID, symbol)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"code":    "INTERNAL_SERVER_ERROR",
+				"message": "Failed to check portfolio",
+				"details": err.Error(),
+			},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"exists":    exists,
+		"portfolio": portfolio,
+	})
+}
