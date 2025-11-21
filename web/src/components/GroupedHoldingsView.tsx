@@ -44,145 +44,45 @@ const GroupedHoldingsView: React.FC<GroupedHoldingsViewProps> = ({
   };
 
   const renderHolding = (holding: Holding) => (
-    <div
-      key={holding.symbol}
-      className="bg-gray-50 dark:bg-gray-700 border-l-4 border-blue-500 dark:border-blue-400 p-4"
-    >
-      {/* Desktop View */}
-      <div className="hidden md:grid md:grid-cols-8 md:gap-4 md:items-center">
-        <div className="col-span-1">
-          <div className="text-sm font-medium text-gray-900 dark:text-white">
-            {holding.symbol}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div className="text-sm text-gray-900 dark:text-gray-200">
-            {holding.shares.toFixed(2)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div className="text-sm text-gray-900 dark:text-gray-200">
-            {formatCurrency(holding.costBasis)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div className="text-sm text-gray-900 dark:text-gray-200">
-            {formatCurrency(holding.currentPrice)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div className="text-sm font-medium text-gray-900 dark:text-white">
-            {formatCurrency(holding.currentValue)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div
-            className={`text-sm font-medium ${
-              holding.gainLoss >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            }`}
-          >
-            {formatCurrency(holding.gainLoss)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div
-            className={`text-sm font-medium ${
-              holding.gainLossPercent >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            }`}
-          >
-            {formatPercent(holding.gainLossPercent)}
-          </div>
-        </div>
-        <div className="col-span-1 text-right">
-          <div className="flex items-center justify-end gap-2">
-            {onEditAsset && holding.portfolioId && (
-              <button
-                onClick={() => onEditAsset(holding.portfolioId!, holding.symbol)}
-                className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                title="Edit classification"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
-            )}
+    <tr key={holding.symbol} className="hover:bg-muted/50 transition-colors">
+      <td className="px-4 py-3 font-medium">{holding.symbol}</td>
+      <td className="px-4 py-3 text-right">{holding.shares.toFixed(2)}</td>
+      <td className="px-4 py-3 text-right text-muted-foreground">
+        {formatCurrency(holding.costBasis)}
+      </td>
+      <td className="px-4 py-3 text-right font-medium">
+        {formatCurrency(holding.currentPrice)}
+      </td>
+      <td className="px-4 py-3 text-right font-bold">
+        {formatCurrency(holding.currentValue)}
+      </td>
+      <td className={`px-4 py-3 text-right font-medium ${holding.gainLoss >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+        {formatCurrency(holding.gainLoss)}
+      </td>
+      <td className={`px-4 py-3 text-right font-medium ${holding.gainLossPercent >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+        {formatPercent(holding.gainLossPercent)}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-2">
+          {onEditAsset && holding.portfolioId && (
             <button
-              onClick={() => onViewTransactions(holding.symbol)}
-              className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              onClick={() => onEditAsset(holding.portfolioId!, holding.symbol)}
+              className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
+              title="Edit classification"
             >
-              <Eye className="h-4 w-4" />
+              <Edit2 className="h-4 w-4" />
             </button>
-          </div>
+          )}
+          <button
+            onClick={() => onViewTransactions(holding.symbol)}
+            className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            title="View transactions"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
         </div>
-      </div>
-
-      {/* Mobile View */}
-      <div className="md:hidden">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h4 className="text-base font-semibold text-gray-900 dark:text-white">
-              {holding.symbol}
-            </h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {holding.shares.toFixed(2)} shares
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {onEditAsset && holding.portfolioId && (
-              <button
-                onClick={() => onEditAsset(holding.portfolioId!, holding.symbol)}
-                className="inline-flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                title="Edit classification"
-              >
-                <Edit2 className="h-4 w-4" />
-              </button>
-            )}
-            <button
-              onClick={() => onViewTransactions(holding.symbol)}
-              className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-            >
-              <Eye className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-gray-500 dark:text-gray-400">Cost Basis</p>
-            <p className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(holding.costBasis)}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500 dark:text-gray-400">Current Price</p>
-            <p className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(holding.currentPrice)}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500 dark:text-gray-400">Current Value</p>
-            <p className="font-medium text-gray-900 dark:text-white">
-              {formatCurrency(holding.currentValue)}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500 dark:text-gray-400">Gain/Loss</p>
-            <p
-              className={`font-medium ${
-                holding.gainLoss >= 0
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-red-600 dark:text-red-400'
-              }`}
-            >
-              {formatCurrency(holding.gainLoss)}
-              <span className="ml-1">({formatPercent(holding.gainLossPercent)})</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 
   return (
@@ -195,59 +95,56 @@ const GroupedHoldingsView: React.FC<GroupedHoldingsViewProps> = ({
         return (
           <div
             key={group.groupName}
-            className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 overflow-hidden"
-            style={{ borderLeft: `4px solid ${groupColor}` }}
+            className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden"
           >
             {/* Group Header */}
             <button
               onClick={() => toggleGroup(group.groupName)}
-              className="w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              style={{ borderLeft: `4px solid ${groupColor}` }}
             >
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <div className="flex items-center gap-3">
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 )}
-                <div className="text-left min-w-0">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 sm:gap-2">
-                    {groupIcon && <span className="text-lg sm:text-xl flex-shrink-0">{groupIcon}</span>}
-                    <span className="truncate">{group.groupName}</span>
-                  </h3>
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    {group.holdings.length} {group.holdings.length === 1 ? 'holding' : 'holdings'}
-                  </p>
+                <div className="flex items-center gap-2">
+                  {groupIcon && <span className="text-lg">{groupIcon}</span>}
+                  <span className="font-semibold">{group.groupName}</span>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {group.holdings.length}
+                  </span>
                 </div>
               </div>
-              <div className="text-right ml-2 flex-shrink-0">
-                <div className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(group.groupValue)}
-                </div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                  {group.percentage.toFixed(2)}%
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <div className="font-bold text-sm">{formatCurrency(group.groupValue)}</div>
+                  <div className="text-xs text-muted-foreground">{group.percentage.toFixed(2)}%</div>
                 </div>
               </div>
             </button>
 
             {/* Group Holdings */}
             {isExpanded && (
-              <div className="border-t border-gray-200 dark:border-gray-700">
-                {/* Desktop Table Header */}
-                <div className="hidden md:grid md:grid-cols-8 md:gap-4 bg-gray-100 dark:bg-gray-700 px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  <div className="col-span-1">Symbol</div>
-                  <div className="col-span-1 text-right">Shares</div>
-                  <div className="col-span-1 text-right">Cost Basis</div>
-                  <div className="col-span-1 text-right">Current Price</div>
-                  <div className="col-span-1 text-right">Current Value</div>
-                  <div className="col-span-1 text-right">Gain/Loss</div>
-                  <div className="col-span-1 text-right">Gain/Loss %</div>
-                  <div className="col-span-1 text-right">Actions</div>
-                </div>
-
-                {/* Holdings List */}
-                <div className="divide-y divide-gray-200 dark:divide-gray-600">
-                  {group.holdings.map(renderHolding)}
-                </div>
+              <div className="border-t border-border overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-muted-foreground font-medium">
+                    <tr>
+                      <th className="px-4 py-2">Symbol</th>
+                      <th className="px-4 py-2 text-right">Shares</th>
+                      <th className="px-4 py-2 text-right">Avg. Cost</th>
+                      <th className="px-4 py-2 text-right">Price</th>
+                      <th className="px-4 py-2 text-right">Value</th>
+                      <th className="px-4 py-2 text-right">Return</th>
+                      <th className="px-4 py-2 text-right">Return %</th>
+                      <th className="px-4 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {group.holdings.map(renderHolding)}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

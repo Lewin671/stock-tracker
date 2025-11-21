@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   TimeScale,
+  Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import 'chartjs-adapter-date-fns';
@@ -24,7 +25,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  Filler
 );
 
 interface PerformanceDataPoint {
@@ -36,7 +38,7 @@ interface HistoricalPerformanceChartProps {
   currency: 'USD' | 'RMB';
 }
 
-type Period = '1M' | '3M' | '6M' | '1Y';
+type Period = '1M' | '3M' | '6M' | '1Y' | 'ALL';
 
 const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({ currency }) => {
   const [period, setPeriod] = useState<Period>('1M');
@@ -66,7 +68,7 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
     }
   };
 
-  const periods: Period[] = ['1M', '3M', '6M', '1Y'];
+  const periods: Period[] = ['1M', '3M', '6M', '1Y', 'ALL'];
 
   const chartData = {
     datasets: [
@@ -77,19 +79,28 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
           y: point.value,
         })),
         borderColor: '#3B82F6',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        backgroundColor: (context: any) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+          gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+          gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+          return gradient;
+        },
         borderWidth: 2,
         fill: true,
         tension: 0.4,
         pointRadius: 0,
-        pointHoverRadius: 5,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#3B82F6',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
       },
     ],
   };
 
   const options: any = {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     interaction: {
       mode: 'index' as const,
       intersect: false,
@@ -99,6 +110,12 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
         display: false,
       },
       tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: false,
         callbacks: {
           label: (context: any) => {
             const value = context.parsed.y;
@@ -111,12 +128,6 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
           title: (context: any) => {
             const timestamp = context[0].parsed.x;
             const date = new Date(timestamp);
-            
-            // Check if date is valid
-            if (isNaN(date.getTime())) {
-              return 'Invalid Date';
-            }
-            
             return date.toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
@@ -140,13 +151,30 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
         grid: {
           display: false,
         },
+        ticks: {
+          color: '#9ca3af',
+          font: {
+            size: 11,
+          },
+        },
       },
       y: {
         beginAtZero: false,
+        grid: {
+          color: 'rgba(156, 163, 175, 0.1)',
+          drawBorder: false,
+        },
         ticks: {
+          color: '#9ca3af',
+          font: {
+            size: 11,
+          },
           callback: (value: any) => {
             const currencySymbol = currency === 'USD' ? '$' : '¥';
-            return `${currencySymbol}${value.toLocaleString('en-US')}`;
+            return `${currencySymbol}${value.toLocaleString('en-US', {
+              notation: 'compact',
+              compactDisplay: 'short',
+            })}`;
           },
         },
       },
@@ -154,42 +182,42 @@ const HistoricalPerformanceChart: React.FC<HistoricalPerformanceChartProps> = ({
   };
 
   return (
-    <div>
-      {/* Period Selector */}
-      <div className="flex gap-2 mb-4">
-        {periods.map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              period === p
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {p}
-          </button>
-        ))}
+    <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-semibold text-lg">Performance Trend</h3>
+        <div className="flex bg-muted rounded-lg p-1">
+          {periods.map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${period === p
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Chart */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-        </div>
-      ) : error ? (
-        <div className="flex items-center justify-center h-64 text-red-600">
-          <p>{error}</p>
-        </div>
-      ) : data.length === 0 ? (
-        <div className="flex items-center justify-center h-64 text-gray-500">
-          <p>No performance data available</p>
-        </div>
-      ) : (
-        <div className="h-64">
+      <div className="h-[300px] w-full">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full text-destructive">
+            <p>{error}</p>
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <p>No performance data available</p>
+          </div>
+        ) : (
           <Line data={chartData} options={options} />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
