@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axiosInstance from '../api/axios';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { Loader2, Plus } from 'lucide-react';
-import Layout from '../components/Layout';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import HoldingsTable from '../components/HoldingsTable';
 import TransactionDialog from '../components/TransactionDialog';
 import TransactionsList from '../components/TransactionsList';
@@ -40,7 +40,7 @@ const HoldingsPage: React.FC = () => {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Dialog states
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
   const [transactionsListOpen, setTransactionsListOpen] = useState(false);
@@ -56,7 +56,7 @@ const HoldingsPage: React.FC = () => {
   const fetchHoldings = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await axiosInstance.get('/api/portfolio/holdings', {
         params: { currency },
@@ -116,18 +116,18 @@ const HoldingsPage: React.FC = () => {
 
   const handleSaveMetadata = async (assetStyleId: string, assetClass: string) => {
     if (!editingPortfolio) return;
-    
+
     // Validate assetClass is one of the allowed values
     const validAssetClasses = ['Stock', 'ETF', 'Bond', 'Cash and Equivalents'];
     if (!validAssetClasses.includes(assetClass)) {
       showError('Invalid asset class', 'Please select a valid asset class');
       return;
     }
-    
+
     try {
       await updatePortfolioMetadata(
-        editingPortfolio.id, 
-        assetStyleId, 
+        editingPortfolio.id,
+        assetStyleId,
         assetClass as 'Stock' | 'ETF' | 'Bond' | 'Cash and Equivalents'
       );
       setEditMetadataDialogOpen(false);
@@ -147,28 +147,29 @@ const HoldingsPage: React.FC = () => {
   };
 
   return (
-    <Layout>
-      {/* Page Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Holdings</h1>
-            {/* Currency Toggle */}
+    <DashboardLayout>
+      {/* Top Bar Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h2 className="text-2xl font-bold tracking-tight">Holdings</h2>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Currency:</span>
             <ToggleGroup.Root
               type="single"
               value={currency}
               onValueChange={handleCurrencyChange}
-              className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1"
+              className="inline-flex bg-muted rounded-lg p-1"
             >
               <ToggleGroup.Item
                 value="USD"
-                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
+                className="px-3 py-1 text-xs font-medium rounded-md transition-all data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm data-[state=off]:text-muted-foreground hover:text-foreground"
               >
                 USD
               </ToggleGroup.Item>
               <ToggleGroup.Item
                 value="RMB"
-                className="px-4 py-2 text-sm font-medium rounded-md transition-colors data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-blue-600 dark:data-[state=on]:text-blue-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-300 data-[state=off]:hover:text-gray-900 dark:data-[state=off]:hover:text-white"
+                className="px-3 py-1 text-xs font-medium rounded-md transition-all data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm data-[state=off]:text-muted-foreground hover:text-foreground"
               >
                 RMB
               </ToggleGroup.Item>
@@ -177,91 +178,88 @@ const HoldingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
-          </div>
-        ) : error ? (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-red-800 dark:text-red-200">{error}</p>
-            <button
-              onClick={fetchHoldings}
-              className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Your Holdings</h2>
-                <button
-                  onClick={handleAddTransaction}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white text-sm font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Transaction
-                </button>
-              </div>
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : error ? (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-destructive">
+          <p>{error}</p>
+          <button
+            onClick={fetchHoldings}
+            className="mt-2 text-sm font-medium hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+          <div className="p-6 border-b border-border">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Your Holdings</h3>
+              <button
+                onClick={handleAddTransaction}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Transaction
+              </button>
             </div>
-            
-            {holdings.length === 0 ? (
-              <div className="p-12 text-center">
-                <p className="text-gray-500 dark:text-gray-400 mb-4">No holdings yet</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Add your first transaction to get started</p>
-              </div>
-            ) : (
-              <div className="p-6">
-                <HoldingsTable
-                  holdings={holdings}
-                  currency={currency}
-                  onViewTransactions={handleViewTransactions}
-                  onEditAsset={handleEditAsset}
-                />
-              </div>
-            )}
           </div>
-        )}
 
-        {/* Transaction Dialog */}
-        <TransactionDialog
-          open={transactionDialogOpen}
+          {holdings.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-muted-foreground mb-4">No holdings yet</p>
+              <p className="text-sm text-muted-foreground/60">Add your first transaction to get started</p>
+            </div>
+          ) : (
+            <div className="p-6">
+              <HoldingsTable
+                holdings={holdings}
+                currency={currency}
+                onViewTransactions={handleViewTransactions}
+                onEditAsset={handleEditAsset}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Transaction Dialog */}
+      <TransactionDialog
+        open={transactionDialogOpen}
+        onClose={() => {
+          setTransactionDialogOpen(false);
+          setEditingTransaction(undefined);
+          setSelectedSymbol(undefined);
+        }}
+        onSuccess={handleTransactionSuccess}
+        symbol={selectedSymbol}
+        transaction={editingTransaction}
+      />
+
+      {/* Transactions List Dialog */}
+      {selectedSymbol && (
+        <TransactionsList
+          open={transactionsListOpen}
           onClose={() => {
-            setTransactionDialogOpen(false);
-            setEditingTransaction(undefined);
+            setTransactionsListOpen(false);
             setSelectedSymbol(undefined);
           }}
-          onSuccess={handleTransactionSuccess}
           symbol={selectedSymbol}
-          transaction={editingTransaction}
+          onEdit={handleEditTransaction}
+          onTransactionDeleted={handleTransactionDeleted}
         />
+      )}
 
-        {/* Transactions List Dialog */}
-        {selectedSymbol && (
-          <TransactionsList
-            open={transactionsListOpen}
-            onClose={() => {
-              setTransactionsListOpen(false);
-              setSelectedSymbol(undefined);
-            }}
-            symbol={selectedSymbol}
-            onEdit={handleEditTransaction}
-            onTransactionDeleted={handleTransactionDeleted}
-          />
-        )}
-
-        {/* Edit Asset Metadata Dialog */}
-        <EditAssetMetadataDialog
-          open={editMetadataDialogOpen}
-          portfolio={editingPortfolio}
-          onSave={handleSaveMetadata}
-          onCancel={handleCancelEditMetadata}
-        />
-      </main>
-    </Layout>
+      {/* Edit Asset Metadata Dialog */}
+      <EditAssetMetadataDialog
+        open={editMetadataDialogOpen}
+        portfolio={editingPortfolio}
+        onSave={handleSaveMetadata}
+        onCancel={handleCancelEditMetadata}
+      />
+    </DashboardLayout>
   );
 };
 

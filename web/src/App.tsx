@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import HoldingsPage from './pages/HoldingsPage';
+import PerformancePage from './pages/PerformancePage';
+import WatchlistPage from './pages/WatchlistPage';
 import SearchPage from './pages/SearchPage';
 import AssetStyleManagementPage from './pages/AssetStyleManagementPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -39,6 +41,22 @@ function App() {
                   }
                 />
                 <Route
+                  path="/performance"
+                  element={
+                    <ProtectedRoute>
+                      <PerformancePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/watchlist"
+                  element={
+                    <ProtectedRoute>
+                      <WatchlistPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/search"
                   element={
                     <ProtectedRoute>
@@ -54,7 +72,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </WatchlistProvider>
           </AuthProvider>
