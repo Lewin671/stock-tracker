@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Plus, Edit2, Trash2, AlertCircle, Tag } from 'lucide-react';
-import Layout from '../components/Layout';
+import { Loader2, Plus, Edit2, Trash2, AlertCircle, Tag, Check, X } from 'lucide-react';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import {
   getAssetStyles,
   createAssetStyle,
@@ -173,48 +173,37 @@ const AssetStyleManagementPage: React.FC = () => {
   );
 
   return (
-    <Layout>
-      {/* Page Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-3">
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <Tag className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Asset Styles</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Manage custom labels to categorize your investments
-              </p>
-            </div>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Asset Styles</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Organize your investments with custom categories
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
             </div>
             <button
               onClick={() => setError(null)}
-              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+              className="text-destructive hover:text-destructive/80"
             >
-              <span className="sr-only">Dismiss</span>
-              ×
+              <X className="h-4 w-4" />
             </button>
           </div>
         )}
 
         {/* Create New Asset Style */}
-        <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Create New Asset Style
-          </h2>
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+          <h3 className="font-semibold text-lg mb-4">Create New Style</h3>
+          <div className="flex gap-3">
             <input
               type="text"
               value={newStyleName}
@@ -222,12 +211,12 @@ const AssetStyleManagementPage: React.FC = () => {
               onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
               placeholder="e.g., Growth Stocks, Value Stocks, Tech Sector"
               maxLength={50}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <button
               onClick={handleCreate}
               disabled={isCreating || !newStyleName.trim()}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 whitespace-nowrap"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium"
             >
               {isCreating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -237,38 +226,35 @@ const AssetStyleManagementPage: React.FC = () => {
               Create
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Asset styles help you organize your investments by custom categories like investment strategy, sector, or risk level.
-          </p>
         </div>
 
         {/* Asset Styles List */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Your Asset Styles
-            </h2>
+        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+          <div className="p-6 border-b">
+            <h3 className="font-semibold text-lg">Your Styles</h3>
           </div>
 
           <div className="p-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : assetStyles.length === 0 ? (
               <div className="text-center py-12">
-                <Tag className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-                <p className="text-gray-600 dark:text-gray-400 mb-1">No asset styles yet</p>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  Create your first asset style to start organizing your investments
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                  <Tag className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-1">No asset styles yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Create your first style to start organizing
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {assetStyles.map((style) => (
                   <div
                     key={style.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
+                    className="flex items-center justify-between p-4 rounded-lg border bg-accent/50 hover:bg-accent transition-colors"
                   >
                     {editingStyle?.id === style.id ? (
                       <>
@@ -278,50 +264,49 @@ const AssetStyleManagementPage: React.FC = () => {
                           onChange={(e) => setEditStyleName(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleUpdate()}
                           maxLength={50}
-                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                           autoFocus
                         />
                         <div className="flex gap-2 ml-3">
                           <button
                             onClick={handleUpdate}
                             disabled={isUpdating}
-                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                            className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                            title="Save"
                           >
-                            {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
-                            Save
+                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                           </button>
                           <button
                             onClick={handleCancelEdit}
                             disabled={isUpdating}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                            className="p-2 border rounded-lg hover:bg-accent transition-colors"
+                            title="Cancel"
                           >
-                            Cancel
+                            <X className="h-4 w-4" />
                           </button>
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 dark:text-white truncate">
+                          <div className="font-medium truncate">
                             {style.name}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Used by {style.usageCount} {style.usageCount === 1 ? 'portfolio' : 'portfolios'}
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {style.usageCount} {style.usageCount === 1 ? 'portfolio' : 'portfolios'}
                           </div>
                         </div>
-                        <div className="flex gap-2 ml-4">
+                        <div className="flex gap-1 ml-4">
                           <button
                             onClick={() => handleStartEdit(style)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-gray-600 rounded-md transition-colors"
-                            aria-label="Edit"
+                            className="p-2 text-muted-foreground hover:text-primary hover:bg-background rounded-lg transition-colors"
                             title="Edit"
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleStartDelete(style)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-white dark:hover:bg-gray-600 rounded-md transition-colors"
-                            aria-label="Delete"
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-background rounded-lg transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -339,35 +324,34 @@ const AssetStyleManagementPage: React.FC = () => {
         {/* Delete Confirmation Modal */}
         {deletingStyle && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-md border">
               <div className="p-6">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                    <h3 className="text-lg font-semibold mb-1">
                       Delete Asset Style
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-muted-foreground">
                       Are you sure you want to delete "{deletingStyle.name}"?
                     </p>
                   </div>
                 </div>
 
                 {deletingStyle.usageCount > 0 && (
-                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
-                      This asset style is used by {deletingStyle.usageCount}{' '}
-                      {deletingStyle.usageCount === 1 ? 'portfolio' : 'portfolios'}. Please select a
-                      replacement asset style to reassign them to:
+                  <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <p className="text-sm text-yellow-600 dark:text-yellow-500 mb-3">
+                      This style is used by {deletingStyle.usageCount}{' '}
+                      {deletingStyle.usageCount === 1 ? 'portfolio' : 'portfolios'}. Select a replacement:
                     </p>
                     <select
                       value={reassignToStyleId}
                       onChange={(e) => setReassignToStyleId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                     >
-                      <option value="">Select an asset style...</option>
+                      <option value="">Select a style...</option>
                       {availableStylesForReassignment.map((style) => (
                         <option key={style.id} value={style.id}>
                           {style.name}
@@ -381,14 +365,14 @@ const AssetStyleManagementPage: React.FC = () => {
                   <button
                     onClick={handleCancelDelete}
                     disabled={isDeleting}
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex-1 px-4 py-2 border rounded-lg hover:bg-accent transition-colors font-medium"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting || (deletingStyle.usageCount > 0 && !reassignToStyleId)}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 font-medium"
                   >
                     {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
                     Delete
@@ -398,8 +382,8 @@ const AssetStyleManagementPage: React.FC = () => {
             </div>
           </div>
         )}
-      </main>
-    </Layout>
+      </div>
+    </DashboardLayout>
   );
 };
 

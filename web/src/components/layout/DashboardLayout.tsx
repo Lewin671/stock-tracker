@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PieChart, LineChart, List, Menu, X, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, PieChart, LineChart, List, Menu, Settings } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 import { useToast } from '../../contexts/ToastContext';
 
