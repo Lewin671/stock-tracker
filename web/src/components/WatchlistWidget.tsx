@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useWatchlist } from '../contexts/WatchlistContext';
-import { TrendingUp, TrendingDown, MoreHorizontal, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AddToWatchlistDialog from './AddToWatchlistDialog';
 
 export const WatchlistWidget: React.FC = () => {
     const { watchlist } = useWatchlist();
     const [showAddDialog, setShowAddDialog] = useState(false);
+    const navigate = useNavigate();
 
     return (
         <>
@@ -27,26 +29,43 @@ export const WatchlistWidget: React.FC = () => {
                                 key={item.symbol}
                                 className="flex items-center justify-between p-3 hover:bg-accent/50 rounded-lg group cursor-pointer transition-colors"
                             >
-                                <div className="flex flex-col">
+                                <div className="flex flex-col min-w-0">
                                     <span className="font-bold text-sm">{item.symbol}</span>
                                     <span className="text-xs text-muted-foreground truncate max-w-[120px]">
                                         {item.name}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                    {/* Mini Chart Placeholder */}
-                                    <div className="w-16 h-8 opacity-50 hidden sm:block">
-                                        {/* We can add a sparkline here later */}
-                                        <svg viewBox="0 0 100 40" className="w-full h-full stroke-current fill-none">
-                                            <path
-                                                d={`M0 20 Q 25 ${item.change >= 0 ? 10 : 30}, 50 20 T 100 ${item.change >= 0 ? 5 : 35}`}
-                                                className={item.change >= 0 ? 'text-emerald-500' : 'text-rose-500'}
-                                                strokeWidth="2"
-                                            />
-                                        </svg>
-                                    </div>
+                                    {/* Mini Chart */}
+                                    {item.sparklineData && item.sparklineData.length > 0 && (
+                                        <div className="w-16 h-8 hidden sm:block">
+                                            <svg viewBox="0 0 100 40" className="w-full h-full stroke-current fill-none">
+                                                <path
+                                                    d={(() => {
+                                                        const data = item.sparklineData;
+                                                        const min = Math.min(...data);
+                                                        const max = Math.max(...data);
+                                                        const range = max - min || 1;
+                                                        
+                                                        const points = data.map((price, i) => {
+                                                            const x = (i / (data.length - 1)) * 100;
+                                                            const y = 40 - ((price - min) / range) * 40;
+                                                            return `${x},${y}`;
+                                                        });
+                                                        
+                                                        return `M ${points.join(' L ')}`;
+                                                    })()}
+                                                    className={item.change >= 0 ? 'text-emerald-500' : 'text-rose-500'}
+                                                    strokeWidth="2"
+                                                />
+                                            </svg>
+                                        </div>
+                                    )}
                                     <div className="flex flex-col items-end min-w-[80px]">
-                                        <span className="font-medium text-sm">${item.price.toFixed(2)}</span>
+                                        <span className="font-medium text-sm">
+                                            {item.currency === 'CNY' ? '¥' : '$'}
+                                            {item.price.toFixed(2)}
+                                        </span>
                                         <span
                                             className={`text-xs font-medium flex items-center ${item.change >= 0 ? 'text-emerald-500' : 'text-rose-500'
                                                 }`}
@@ -66,7 +85,10 @@ export const WatchlistWidget: React.FC = () => {
                     </div>
                 </div>
                 <div className="p-4 border-t border-border">
-                    <button className="w-full py-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                    <button 
+                        onClick={() => navigate('/watchlist')}
+                        className="w-full py-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
                         View All
                     </button>
                 </div>

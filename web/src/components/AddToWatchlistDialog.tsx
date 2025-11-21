@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Search, Loader2, Plus } from 'lucide-react';
 import { useWatchlist } from '../contexts/WatchlistContext';
 import { useToast } from '../contexts/ToastContext';
+import { searchStock, StockInfo } from '../api/stocks';
 
 interface AddToWatchlistDialogProps {
     open: boolean;
@@ -10,11 +11,46 @@ interface AddToWatchlistDialogProps {
 }
 
 const AddToWatchlistDialog: React.FC<AddToWatchlistDialogProps> = ({ open, onClose }) => {
-    const { addToWatchlist, watchlist } = useWatchlist();
+    const { addToWatchlist, isInWatchlist } = useWatchlist();
     const { showSuccess, showError } = useToast();
     const [symbol, setSymbol] = useState('');
     const [loading, setLoading] = useState(false);
+    const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [searchResult, setSearchResult] = useState<StockInfo | null>(null);
+
+    // Reset state when dialog opens/closes
+    useEffect(() => {
+        if (!open) {
+            setSymbol('');
+            setSearchResult(null);
+            setError(null);
+        }
+    }, [open]);
+
+    // Search for stock as user types (with debounce)
+    useEffect(() => {
+        if (!symbol.trim() || symbol.length < 1) {
+            setSearchResult(null);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setSearching(true);
+            setError(null);
+            try {
+                const result = await searchStock(symbol);
+                setSearchResult(result);
+            } catch (err: any) {
+                setSearchResult(null);
+                // Don't show error while typing, only on submit
+            } finally {
+                setSearching(false);
+            }
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timer);
+    }, [symbol]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,7 +63,7 @@ const AddToWatchlistDialog: React.FC<AddToWatchlistDialogProps> = ({ open, onClo
         const upperSymbol = symbol.toUpperCase().trim();
 
         // Check if already in watchlist
-        if (watchlist.some(item => item.symbol === upperSymbol)) {
+        if (isInWatchlist(upperSymbol)) {
             setError('This symbol is already in your watchlist');
             return;
         }
@@ -36,22 +72,13 @@ const AddToWatchlistDialog: React.FC<AddToWatchlistDialogProps> = ({ open, onClo
         setError(null);
 
         try {
-            // Create a WatchlistItem object with the symbol
-            // In a real app, you'd fetch this data from an API
-            const newItem = {
-                symbol: upperSymbol,
-                name: `${upperSymbol} Inc.`, // Placeholder name
-                price: 0, // Will be updated when real data is fetched
-                change: 0,
-                changePercent: 0,
-            };
-
-            await addToWatchlist(newItem);
+            await addToWatchlist(upperSymbol);
             showSuccess('Added to watchlist', `${upperSymbol} has been added to your watchlist`);
             setSymbol('');
+            setSearchResult(null);
             onClose();
         } catch (err: any) {
-            const errorMessage = err.response?.data?.message || err.message || 'Failed to add symbol';
+            const errorMessage = err.message || 'Failed to add symbol. Please check if the symbol is valid.';
             setError(errorMessage);
             showError('Failed to add symbol', errorMessage);
         } finally {
@@ -106,16 +133,54 @@ const AddToWatchlistDialog: React.FC<AddToWatchlistDialogProps> = ({ open, onClo
                                             setSymbol(e.target.value.toUpperCase());
                                             setError(null);
                                         }}
-                                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="AAPL, GOOGL, TSLA..."
                                         autoFocus
                                         disabled={loading}
                                     />
+                                    {searching && (
+                                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                                    )}
                                 </div>
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Enter a stock ticker symbol to add to your watchlist
+                                    Enter a stock ticker symbol (e.g., AAPL for US stocks, 600519.SS for Chinese stocks)
                                 </p>
                             </div>
+
+                            {/* Search Result Preview */}
+                            {searchResult && !searching && (
+                                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h4 className="font-semibold text-gray-900 dark:text-white">
+                                                    {searchResult.symbol}
+                                                </h4>
+                                                <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                                    {searchResult.currency}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                                {searchResult.name}
+                                            </p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-lg font-bold text-gray-900 dark:text-white">
+                                                    {searchResult.currency === 'CNY' ? '¥' : '$'}
+                                                    {searchResult.currentPrice.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {symbol && !searching && !searchResult && symbol.length >= 1 && (
+                                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                                        No results found. Make sure the symbol is correct.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="flex gap-3 pt-4">
                                 <button
