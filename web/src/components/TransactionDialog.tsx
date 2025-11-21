@@ -118,7 +118,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -146,7 +146,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
       } else {
         // Check if portfolio exists for this symbol
         const portfolioCheck = await checkPortfolioExists(payload.symbol);
-        
+
         if (!portfolioCheck.exists) {
           // Portfolio doesn't exist, show asset classification dialog
           setPendingTransaction(payload);
@@ -204,10 +204,10 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
     try {
       // First, create the transaction which will create the portfolio
       await axiosInstance.post('/api/portfolio/transactions', pendingTransaction);
-      
+
       // Get the portfolio ID from the response or fetch it
       const portfolioCheck = await checkPortfolioExists(pendingTransaction.symbol);
-      
+
       if (portfolioCheck.exists && portfolioCheck.portfolio) {
         // Update the portfolio metadata
         await updatePortfolioMetadata(portfolioCheck.portfolio.id, assetStyleId, assetClass as any);
@@ -242,211 +242,206 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
         onSave={handleAssetClassSave}
         onCancel={handleAssetClassCancel}
       />
-      
+
       <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
           <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-white">
-                {transaction ? 'Edit Transaction' : 'Add Transaction'}
-              </Dialog.Title>
-              <Dialog.Close asChild>
-                <button
-                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </Dialog.Close>
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {transaction ? 'Edit Transaction' : 'Add Transaction'}
+                </Dialog.Title>
+                <Dialog.Close asChild>
+                  <button
+                    className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </Dialog.Close>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Symbol */}
+                <div>
+                  <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Symbol *
+                  </label>
+                  <div className="relative">
+                    <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <input
+                      id="symbol"
+                      type="text"
+                      value={formData.symbol}
+                      onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      placeholder="AAPL"
+                      disabled={!!transaction}
+                    />
+                  </div>
+                  {errors.symbol && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol}</p>}
+                </div>
+
+                {/* Action */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Action *
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="buy"
+                        checked={formData.action === 'buy'}
+                        onChange={(e) => handleChange('action', e.target.value)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Buy</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="sell"
+                        checked={formData.action === 'sell'}
+                        onChange={(e) => handleChange('action', e.target.value)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Sell</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Shares */}
+                <div>
+                  <label htmlFor="shares" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Shares *
+                  </label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <input
+                      id="shares"
+                      type="number"
+                      step="0.01"
+                      value={formData.shares}
+                      onChange={(e) => handleChange('shares', e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.shares ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      placeholder="10"
+                    />
+                  </div>
+                  {errors.shares && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.shares}</p>}
+                </div>
+
+                {/* Price */}
+                <div>
+                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Price *
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(e) => handleChange('price', e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.price ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      placeholder="150.50"
+                    />
+                  </div>
+                  {errors.price && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>}
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date *
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <input
+                      id="date"
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => handleChange('date', e.target.value)}
+                      max={new Date().toISOString().split('T')[0]}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.date ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                    />
+                  </div>
+                  {errors.date && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.date}</p>}
+                </div>
+
+                {/* Currency */}
+                <div>
+                  <label htmlFor="currency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Currency *
+                  </label>
+                  <select
+                    id="currency"
+                    value={formData.currency}
+                    onChange={(e) => handleChange('currency', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="RMB">RMB</option>
+                  </select>
+                </div>
+
+                {/* Fees (Optional) */}
+                <div>
+                  <label htmlFor="fees" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Fees (Optional)
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <input
+                      id="fees"
+                      type="number"
+                      step="0.01"
+                      value={formData.fees}
+                      onChange={(e) => handleChange('fees', e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.fees ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      placeholder="5.00"
+                    />
+                  </div>
+                  {errors.fees && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.fees}</p>}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                    disabled={loading}
+                  >
+                    {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {transaction ? 'Update' : 'Add'}
+                  </button>
+                </div>
+              </form>
             </div>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Symbol */}
-              <div>
-                <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Symbol *
-                </label>
-                <div className="relative">
-                  <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                  <input
-                    id="symbol"
-                    type="text"
-                    value={formData.symbol}
-                    onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-                    }`}
-                    placeholder="AAPL"
-                    disabled={!!transaction}
-                  />
-                </div>
-                {errors.symbol && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol}</p>}
-              </div>
-
-              {/* Action */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Action *
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="buy"
-                      checked={formData.action === 'buy'}
-                      onChange={(e) => handleChange('action', e.target.value)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Buy</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="sell"
-                      checked={formData.action === 'sell'}
-                      onChange={(e) => handleChange('action', e.target.value)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Sell</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Shares */}
-              <div>
-                <label htmlFor="shares" className="block text-sm font-medium text-gray-700 mb-1">
-                  Shares *
-                </label>
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    id="shares"
-                    type="number"
-                    step="0.01"
-                    value={formData.shares}
-                    onChange={(e) => handleChange('shares', e.target.value)}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.shares ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="10"
-                  />
-                </div>
-                {errors.shares && <p className="mt-1 text-sm text-red-600">{errors.shares}</p>}
-              </div>
-
-              {/* Price */}
-              <div>
-                <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-                  Price *
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => handleChange('price', e.target.value)}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.price ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="150.50"
-                  />
-                </div>
-                {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
-              </div>
-
-              {/* Date */}
-              <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
-                  Date *
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => handleChange('date', e.target.value)}
-                    max={new Date().toISOString().split('T')[0]}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.date ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  />
-                </div>
-                {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date}</p>}
-              </div>
-
-              {/* Currency */}
-              <div>
-                <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-                  Currency *
-                </label>
-                <select
-                  id="currency"
-                  value={formData.currency}
-                  onChange={(e) => handleChange('currency', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="USD">USD</option>
-                  <option value="RMB">RMB</option>
-                </select>
-              </div>
-
-              {/* Fees (Optional) */}
-              <div>
-                <label htmlFor="fees" className="block text-sm font-medium text-gray-700 mb-1">
-                  Fees (Optional)
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    id="fees"
-                    type="number"
-                    step="0.01"
-                    value={formData.fees}
-                    onChange={(e) => handleChange('fees', e.target.value)}
-                    className={`w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.fees ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="5.00"
-                  />
-                </div>
-                {errors.fees && <p className="mt-1 text-sm text-red-600">{errors.fees}</p>}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                  disabled={loading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                  disabled={loading}
-                >
-                  {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {transaction ? 'Update' : 'Add'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 };

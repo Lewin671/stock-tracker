@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Plus, Search, TrendingUp, TrendingDown, X } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { useWatchlist } from '../contexts/WatchlistContext';
+import AddToWatchlistDialog from '../components/AddToWatchlistDialog';
 
 const WatchlistPage: React.FC = () => {
     const { watchlist } = useWatchlist();
     const [searchQuery, setSearchQuery] = useState('');
+    const [showAddDialog, setShowAddDialog] = useState(false);
 
     const filteredWatchlist = watchlist.filter(
         (item) =>
@@ -15,11 +17,15 @@ const WatchlistPage: React.FC = () => {
 
     return (
         <DashboardLayout>
+            <AddToWatchlistDialog open={showAddDialog} onClose={() => setShowAddDialog(false)} />
             {/* Top Bar Controls */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <h2 className="text-2xl font-bold tracking-tight">Watchlist</h2>
 
-                <button className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors">
+                <button
+                    onClick={() => setShowAddDialog(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
+                >
                     <Plus className="h-4 w-4" />
                     Add Symbol
                 </button>

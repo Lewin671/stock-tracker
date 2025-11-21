@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, PieChart, LineChart, List, Menu, X, Settings, LogOut } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
+import { useToast } from '../../contexts/ToastContext';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -10,6 +11,7 @@ interface DashboardLayoutProps {
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const location = useLocation();
+    const { showInfo } = useToast();
 
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -76,7 +78,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
                     </h1>
                     <div className="flex items-center gap-4">
                         <ThemeToggle />
-                        <button className="p-2 rounded-full hover:bg-accent text-muted-foreground">
+                        <button
+                            onClick={() => showInfo('Settings', 'Settings page coming soon!')}
+                            className="p-2 rounded-full hover:bg-accent text-muted-foreground"
+                        >
                             <Settings className="w-5 h-5" />
                         </button>
                         <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm font-medium">
