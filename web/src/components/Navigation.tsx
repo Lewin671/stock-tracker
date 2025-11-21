@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import * as Dialog from '@radix-ui/react-dialog';
 import { LayoutDashboard, Briefcase, Search, LogOut, Menu, X, Tag } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import UserMenu from './UserMenu';
 
 const Navigation: React.FC = () => {
   const { logout } = useAuth();
@@ -57,14 +58,7 @@ const Navigation: React.FC = () => {
             })}
             
             <ThemeToggle variant="icon-only" />
-            
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 ml-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
+            <UserMenu />
           </div>
 
           {/* Mobile Menu Button */}

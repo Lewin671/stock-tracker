@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PieChart, LineChart, List, Menu, Settings } from 'lucide-react';
+import { LayoutDashboard, PieChart, LineChart, List, Menu } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
-import { useToast } from '../../contexts/ToastContext';
+import UserMenu from '../UserMenu';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -11,7 +11,6 @@ interface DashboardLayoutProps {
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const location = useLocation();
-    const { showInfo } = useToast();
 
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -76,17 +75,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
                     <h1 className="text-lg font-semibold text-foreground">
                         {navigation.find((n) => n.href === location.pathname)?.name || 'Dashboard'}
                     </h1>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         <ThemeToggle />
-                        <button
-                            onClick={() => showInfo('Settings', 'Settings page coming soon!')}
-                            className="p-2 rounded-full hover:bg-accent text-muted-foreground"
-                        >
-                            <Settings className="w-5 h-5" />
-                        </button>
-                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm font-medium">
-                            JD
-                        </div>
+                        <UserMenu />
                     </div>
                 </header>
 
