@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
 import { Search, Loader2, TrendingUp, AlertCircle } from 'lucide-react';
-import Layout from '../components/Layout';
+import { DashboardLayout } from '../components/layout/DashboardLayout';
 import TransactionDialog from '../components/TransactionDialog';
 import { useToast } from '../contexts/ToastContext';
 import { formatErrorMessage } from '../utils/errorHandler';
@@ -78,16 +78,8 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <Layout>
-      {/* Page Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Search Stocks</h1>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto">
         {/* Search Input */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900 p-6 mb-6">
           <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -194,8 +186,8 @@ const SearchPage: React.FC = () => {
           onSuccess={handleTransactionSuccess}
           symbol={selectedSymbol}
         />
-      </main>
-    </Layout>
+      </div>
+    </DashboardLayout>
   );
 };
 

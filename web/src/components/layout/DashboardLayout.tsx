@@ -8,6 +8,19 @@ interface DashboardLayoutProps {
     children: React.ReactNode;
 }
 
+const getPageTitle = (pathname: string): string => {
+    const titles: Record<string, string> = {
+        '/': 'Dashboard',
+        '/dashboard': 'Dashboard',
+        '/holdings': 'Holdings',
+        '/performance': 'Performance',
+        '/watchlist': 'Watchlist',
+        '/search': 'Search',
+        '/asset-styles': 'Asset Styles',
+    };
+    return titles[pathname] || 'Dashboard';
+};
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const location = useLocation();
@@ -73,7 +86,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
                 {/* Header */}
                 <header className="h-16 border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-20 px-6 flex items-center justify-between">
                     <h1 className="text-lg font-semibold text-foreground">
-                        {navigation.find((n) => n.href === location.pathname)?.name || 'Dashboard'}
+                        {navigation.find((n) => n.href === location.pathname)?.name || getPageTitle(location.pathname)}
                     </h1>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
