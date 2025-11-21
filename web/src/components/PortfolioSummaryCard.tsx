@@ -18,13 +18,19 @@ export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
   totalGainLossPercent,
   currency,
 }) => {
+  // Provide default values for potentially undefined fields
+  const safeDayChange = dayChange ?? 0;
+  const safeDayChangePercent = dayChangePercent ?? 0;
+  const safeTotalGainLoss = totalGainLoss ?? 0;
+  const safeTotalGainLossPercent = totalGainLossPercent ?? 0;
+
   const formatCurrency = (value: number) => {
     const symbol = currency === 'USD' ? '$' : '¥';
     return `${symbol}${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const isPositiveDay = dayChange >= 0;
-  const isPositiveTotal = totalGainLoss >= 0;
+  const isPositiveDay = safeDayChange >= 0;
+  const isPositiveTotal = safeTotalGainLoss >= 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -52,11 +58,11 @@ export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
         </div>
         <div className="text-2xl font-bold flex items-center gap-2">
           <span className={isPositiveDay ? 'text-emerald-500' : 'text-rose-500'}>
-            {isPositiveDay ? '+' : '-'}{formatCurrency(dayChange)}
+            {isPositiveDay ? '+' : '-'}{formatCurrency(safeDayChange)}
           </span>
         </div>
         <p className={`text-xs mt-1 font-medium ${isPositiveDay ? 'text-emerald-500' : 'text-rose-500'}`}>
-          {isPositiveDay ? '+' : ''}{dayChangePercent.toFixed(2)}%
+          {isPositiveDay ? '+' : ''}{safeDayChangePercent.toFixed(2)}%
         </p>
       </div>
 
@@ -68,11 +74,11 @@ export const PortfolioSummaryCard: React.FC<PortfolioSummaryCardProps> = ({
         </div>
         <div className="text-2xl font-bold flex items-center gap-2">
           <span className={isPositiveTotal ? 'text-emerald-500' : 'text-rose-500'}>
-            {isPositiveTotal ? '+' : '-'}{formatCurrency(totalGainLoss)}
+            {isPositiveTotal ? '+' : '-'}{formatCurrency(safeTotalGainLoss)}
           </span>
         </div>
         <p className={`text-xs mt-1 font-medium ${isPositiveTotal ? 'text-emerald-500' : 'text-rose-500'}`}>
-          {isPositiveTotal ? '+' : ''}{totalGainLossPercent.toFixed(2)}%
+          {isPositiveTotal ? '+' : ''}{safeTotalGainLossPercent.toFixed(2)}%
         </p>
       </div>
     </div>

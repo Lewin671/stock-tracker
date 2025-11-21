@@ -14,11 +14,13 @@ import (
 
 // DashboardMetrics represents portfolio dashboard metrics
 type DashboardMetrics struct {
-	TotalValue       float64          `json:"totalValue"`
-	TotalGain        float64          `json:"totalGain"`
-	PercentageReturn float64          `json:"percentageReturn"`
-	Allocation       []AllocationItem `json:"allocation"`
-	Currency         string           `json:"currency"`
+	TotalValue        float64          `json:"totalValue"`
+	TotalGain         float64          `json:"totalGain"`
+	PercentageReturn  float64          `json:"percentageReturn"`
+	DayChange         float64          `json:"dayChange"`
+	DayChangePercent  float64          `json:"dayChangePercent"`
+	Allocation        []AllocationItem `json:"allocation"`
+	Currency          string           `json:"currency"`
 }
 
 // AllocationItem represents a single allocation entry
@@ -44,12 +46,14 @@ type GroupedHolding struct {
 
 // GroupedDashboardMetrics represents dashboard metrics grouped by specified dimension
 type GroupedDashboardMetrics struct {
-	TotalValue       float64          `json:"totalValue"`
-	TotalGain        float64          `json:"totalGain"`
-	PercentageReturn float64          `json:"percentageReturn"`
-	Groups           []GroupedHolding `json:"groups"`
-	Currency         string           `json:"currency"`
-	GroupBy          string           `json:"groupBy"`
+	TotalValue        float64          `json:"totalValue"`
+	TotalGain         float64          `json:"totalGain"`
+	PercentageReturn  float64          `json:"percentageReturn"`
+	DayChange         float64          `json:"dayChange"`
+	DayChangePercent  float64          `json:"dayChangePercent"`
+	Groups            []GroupedHolding `json:"groups"`
+	Currency          string           `json:"currency"`
+	GroupBy           string           `json:"groupBy"`
 }
 
 // AnalyticsService handles analytics and performance calculations
@@ -94,26 +98,59 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 	// If no holdings, return zero metrics
 	if len(holdings) == 0 {
 		return &DashboardMetrics{
-			TotalValue:       0,
-			TotalGain:        0,
-			PercentageReturn: 0,
-			Allocation:       []AllocationItem{},
-			Currency:         currency,
+			TotalValue:        0,
+			TotalGain:         0,
+			PercentageReturn:  0,
+			DayChange:         0,
+			DayChangePercent:  0,
+			Allocation:        []AllocationItem{},
+			Currency:          currency,
 		}, nil
 	}
 	
-	// Calculate total portfolio value and cost basis
+	// Calculate total portfolio value, cost basis, and day change
 	// Holdings are already in the requested currency from GetUserHoldings
 	var totalValue float64
 	var totalCostBasis float64
+	var dayChange float64
 	allocation := make([]AllocationItem, 0, len(holdings))
 	
+	// Get previous day's closing prices for all symbols
+	previousDayValue := 0.0
 	for _, holding := range holdings {
 		fmt.Printf("[Analytics] Processing holding: %s (%.2f shares, value: %.2f %s)\n", 
 			holding.Symbol, holding.Shares, holding.CurrentValue, holding.Currency)
 		
 		totalValue += holding.CurrentValue
 		totalCostBasis += holding.CostBasis
+		
+		// Calculate previous day value for this holding
+		prevDayPrice, err := s.getPreviousDayPrice(holding.Symbol)
+		if err != nil {
+			fmt.Printf("[Analytics] Warning: Could not get previous day price for %s: %v\n", holding.Symbol, err)
+			// If we can't get previous day price, assume no change for this holding
+			previousDayValue += holding.CurrentValue
+		} else {
+			prevValue := holding.Shares * prevDayPrice
+			
+			// Convert to target currency if needed
+			symbolCurrency := "USD"
+			if s.stockService.IsChinaStock(holding.Symbol) {
+				symbolCurrency = "CNY"
+			}
+			
+			if symbolCurrency != currency {
+				convertedPrevValue, err := s.currencyService.ConvertAmount(prevValue, symbolCurrency, currency)
+				if err != nil {
+					fmt.Printf("[Analytics] Warning: Could not convert currency for %s: %v\n", holding.Symbol, err)
+					previousDayValue += holding.CurrentValue
+				} else {
+					previousDayValue += convertedPrevValue
+				}
+			} else {
+				previousDayValue += prevValue
+			}
+		}
 		
 		// Add to allocation
 		allocation = append(allocation, AllocationItem{
@@ -122,6 +159,9 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 			Percentage: 0, // Will calculate after we have total
 		})
 	}
+	
+	// Calculate day change
+	dayChange = totalValue - previousDayValue
 	
 	// Calculate percentages for allocation
 	for i := range allocation {
@@ -139,15 +179,23 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 		percentageReturn = (totalGain / totalCostBasis) * 100
 	}
 	
-	fmt.Printf("[Analytics] Dashboard metrics calculated - TotalValue: %.2f, TotalGain: %.2f, Return: %.2f%%\n", 
-		totalValue, totalGain, percentageReturn)
+	// Calculate day change percentage
+	dayChangePercent := 0.0
+	if previousDayValue > 0 {
+		dayChangePercent = (dayChange / previousDayValue) * 100
+	}
+	
+	fmt.Printf("[Analytics] Dashboard metrics calculated - TotalValue: %.2f, TotalGain: %.2f, Return: %.2f%%, DayChange: %.2f (%.2f%%)\n", 
+		totalValue, totalGain, percentageReturn, dayChange, dayChangePercent)
 	
 	return &DashboardMetrics{
-		TotalValue:       totalValue,
-		TotalGain:        totalGain,
-		PercentageReturn: percentageReturn,
-		Allocation:       allocation,
-		Currency:         currency,
+		TotalValue:        totalValue,
+		TotalGain:         totalGain,
+		PercentageReturn:  percentageReturn,
+		DayChange:         dayChange,
+		DayChangePercent:  dayChangePercent,
+		Allocation:        allocation,
+		Currency:          currency,
 	}, nil
 }
 
@@ -391,12 +439,14 @@ func (s *AnalyticsService) GetGroupedDashboardMetrics(userID primitive.ObjectID,
 	// If no holdings, return empty metrics
 	if len(holdings) == 0 {
 		return &GroupedDashboardMetrics{
-			TotalValue:       0,
-			TotalGain:        0,
-			PercentageReturn: 0,
-			Groups:           []GroupedHolding{},
-			Currency:         currency,
-			GroupBy:          groupBy,
+			TotalValue:        0,
+			TotalGain:         0,
+			PercentageReturn:  0,
+			DayChange:         0,
+			DayChangePercent:  0,
+			Groups:            []GroupedHolding{},
+			Currency:          currency,
+			GroupBy:           groupBy,
 		}, nil
 	}
 
@@ -492,6 +542,7 @@ func (s *AnalyticsService) GetGroupedDashboardMetrics(userID primitive.ObjectID,
 	// Calculate totals and group metrics in a single pass
 	var totalValue float64
 	var totalCostBasis float64
+	var previousDayValue float64
 	groupedHoldings := make([]GroupedHolding, 0, len(groups))
 
 	for groupName, groupHoldings := range groups {
@@ -500,6 +551,33 @@ func (s *AnalyticsService) GetGroupedDashboardMetrics(userID primitive.ObjectID,
 			groupValue += holding.CurrentValue
 			totalValue += holding.CurrentValue
 			totalCostBasis += holding.CostBasis
+			
+			// Calculate previous day value for this holding
+			prevDayPrice, err := s.getPreviousDayPrice(holding.Symbol)
+			if err != nil {
+				fmt.Printf("[Analytics] Warning: Could not get previous day price for %s: %v\n", holding.Symbol, err)
+				previousDayValue += holding.CurrentValue
+			} else {
+				prevValue := holding.Shares * prevDayPrice
+				
+				// Convert to target currency if needed
+				symbolCurrency := "USD"
+				if s.stockService.IsChinaStock(holding.Symbol) {
+					symbolCurrency = "CNY"
+				}
+				
+				if symbolCurrency != currency {
+					convertedPrevValue, err := s.currencyService.ConvertAmount(prevValue, symbolCurrency, currency)
+					if err != nil {
+						fmt.Printf("[Analytics] Warning: Could not convert currency for %s: %v\n", holding.Symbol, err)
+						previousDayValue += holding.CurrentValue
+					} else {
+						previousDayValue += convertedPrevValue
+					}
+				} else {
+					previousDayValue += prevValue
+				}
+			}
 		}
 
 		groupedHoldings = append(groupedHoldings, GroupedHolding{
@@ -528,14 +606,23 @@ func (s *AnalyticsService) GetGroupedDashboardMetrics(userID primitive.ObjectID,
 	if totalCostBasis > 0 {
 		percentageReturn = (totalGain / totalCostBasis) * 100
 	}
+	
+	// Calculate day change
+	dayChange := totalValue - previousDayValue
+	dayChangePercent := 0.0
+	if previousDayValue > 0 {
+		dayChangePercent = (dayChange / previousDayValue) * 100
+	}
 
 	return &GroupedDashboardMetrics{
-		TotalValue:       totalValue,
-		TotalGain:        totalGain,
-		PercentageReturn: percentageReturn,
-		Groups:           groupedHoldings,
-		Currency:         currency,
-		GroupBy:          groupBy,
+		TotalValue:        totalValue,
+		TotalGain:         totalGain,
+		PercentageReturn:  percentageReturn,
+		DayChange:         dayChange,
+		DayChangePercent:  dayChangePercent,
+		Groups:            groupedHoldings,
+		Currency:          currency,
+		GroupBy:           groupBy,
 	}, nil
 }
 
@@ -603,4 +690,27 @@ func (s *AnalyticsService) groupByCurrency(holdings []Holding, portfolioMap map[
 	}
 
 	return groups
+}
+
+// getPreviousDayPrice fetches the previous trading day's closing price for a symbol
+func (s *AnalyticsService) getPreviousDayPrice(symbol string) (float64, error) {
+	// Fetch 5 days of historical data to ensure we get at least 2 data points
+	// (accounting for weekends and holidays)
+	historicalData, err := s.stockService.GetHistoricalData(symbol, "1M")
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch historical data: %w", err)
+	}
+	
+	if len(historicalData) < 2 {
+		return 0, fmt.Errorf("insufficient historical data")
+	}
+	
+	// Sort by date descending to get most recent prices
+	sort.Slice(historicalData, func(i, j int) bool {
+		return historicalData[i].Date.After(historicalData[j].Date)
+	})
+	
+	// The second most recent price is the previous day's close
+	// (most recent is today's price, which might be intraday)
+	return historicalData[1].Price, nil
 }

@@ -156,8 +156,8 @@ const DashboardPage: React.FC = () => {
           <div className="col-span-12 lg:col-span-9 space-y-6">
             <PortfolioSummaryCard
               totalValue={metrics.totalValue}
-              dayChange={0} // TODO: Add day change to API
-              dayChangePercent={0} // TODO: Add day change percent to API
+              dayChange={metrics.dayChange}
+              dayChangePercent={metrics.dayChangePercent}
               totalGainLoss={metrics.totalGain}
               totalGainLossPercent={metrics.percentageReturn}
               currency={currency}

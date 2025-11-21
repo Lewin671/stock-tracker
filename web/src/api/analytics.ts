@@ -13,6 +13,8 @@ export interface DashboardMetrics {
   totalValue: number;
   totalGain: number;
   percentageReturn: number;
+  dayChange: number;
+  dayChangePercent: number;
   allocation: AllocationItem[];
   currency: string;
 }
@@ -40,6 +42,8 @@ export interface GroupedDashboardMetrics {
   totalValue: number;
   totalGain: number;
   percentageReturn: number;
+  dayChange: number;
+  dayChangePercent: number;
   groups: GroupedHolding[];
   currency: string;
   groupBy: GroupingMode;
