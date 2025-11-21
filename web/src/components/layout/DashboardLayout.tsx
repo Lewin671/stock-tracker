@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, PieChart, LineChart, List, Menu } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 import UserMenu from '../UserMenu';
@@ -24,6 +24,7 @@ const getPageTitle = (pathname: string): string => {
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const location = useLocation();
+    const navigate = useNavigate();
 
     const navigation = [
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -40,12 +41,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
                     } bg-card border-r border-border transition-all duration-300 flex flex-col fixed h-full z-30 hidden md:flex`}
             >
                 <div className="h-16 flex items-center px-6 border-b border-border">
-                    <div className="flex items-center gap-2 font-bold text-xl text-primary">
+                    <button 
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-2 font-bold text-xl text-primary hover:opacity-80 transition-opacity"
+                    >
                         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
                             S
                         </div>
                         {isSidebarOpen && <span>StockTracker</span>}
-                    </div>
+                    </button>
                 </div>
 
                 <nav className="flex-1 py-6 px-3 space-y-1">
@@ -85,9 +89,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
             <main className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
                 {/* Header */}
                 <header className="h-16 border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-20 px-6 flex items-center justify-between">
-                    <h1 className="text-lg font-semibold text-foreground">
+                    <button 
+                        onClick={() => navigate('/')}
+                        className="text-lg font-semibold text-foreground hover:text-primary transition-colors"
+                    >
                         {navigation.find((n) => n.href === location.pathname)?.name || getPageTitle(location.pathname)}
-                    </h1>
+                    </button>
                     <div className="flex items-center gap-2">
                         <ThemeToggle />
                         <UserMenu />
