@@ -789,9 +789,18 @@ func (s *AnalyticsService) groupByCurrency(holdings []Holding, portfolioMap map[
 			continue
 		}
 
-		// Determine currency based on symbol (US stocks vs China stocks)
+		// Determine currency based on symbol type
 		currency := "USD"
-		if s.stockService.IsChinaStock(portfolio.Symbol) {
+		
+		// Check if it's cash first
+		if s.stockService.IsCashSymbol(portfolio.Symbol) {
+			if portfolio.Symbol == "CASH_RMB" {
+				currency = "RMB"
+			} else {
+				currency = "USD"
+			}
+		} else if s.stockService.IsChinaStock(portfolio.Symbol) {
+			// Check if it's a China stock
 			currency = "RMB"
 		}
 
