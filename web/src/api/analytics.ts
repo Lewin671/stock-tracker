@@ -21,6 +21,7 @@ export interface DashboardMetrics {
 
 export interface Holding {
   symbol: string;
+  name?: string;
   shares: number;
   costBasis: number;
   currentPrice: number;

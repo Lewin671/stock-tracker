@@ -1,8 +1,9 @@
 import React from 'react';
-import { Eye, Edit2, MoreHorizontal, Wallet } from 'lucide-react';
+import { Eye, Edit2, Wallet } from 'lucide-react';
 
 interface Holding {
   symbol: string;
+  name?: string;
   shares: number;
   costBasis: number;
   currentPrice: number;
@@ -46,7 +47,7 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
         <table className="w-full text-sm text-left">
           <thead className="bg-muted/50 text-muted-foreground font-medium">
             <tr>
-              <th className="px-4 py-3">Symbol</th>
+              <th className="px-4 py-3">Asset</th>
               <th className="px-4 py-3 text-right">Shares</th>
               <th className="px-4 py-3 text-right">Avg. Cost</th>
               <th className="px-4 py-3 text-right">Price</th>
@@ -61,10 +62,17 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
               const isCash = isCashSymbol(holding.symbol);
               return (
                 <tr key={holding.symbol} className="hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-3 font-medium">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       {isCash && <Wallet className="h-4 w-4 text-muted-foreground" />}
-                      {isCash ? getCashDisplayName(holding.symbol) : holding.symbol}
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">
+                          {isCash ? getCashDisplayName(holding.symbol) : (holding.name || holding.symbol)}
+                        </div>
+                        {!isCash && holding.name && (
+                          <div className="text-xs text-muted-foreground">{holding.symbol}</div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">{holding.shares.toFixed(2)}</td>

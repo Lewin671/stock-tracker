@@ -25,6 +25,7 @@ var (
 type Holding struct {
 	PortfolioID     string  `json:"portfolioId,omitempty"`
 	Symbol          string  `json:"symbol"`
+	Name            string  `json:"name"`
 	Shares          float64 `json:"shares"`
 	CostBasis       float64 `json:"costBasis"`
 	CurrentPrice    float64 `json:"currentPrice"`
@@ -442,6 +443,7 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 	if totalShares <= 0 {
 		return &Holding{
 			Symbol:          symbol,
+			Name:            "",
 			Shares:          0,
 			CostBasis:       0,
 			CurrentPrice:    0,
@@ -497,6 +499,7 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 
 	return &Holding{
 		Symbol:          symbol,
+		Name:            stockInfo.Name,
 		Shares:          totalShares,
 		CostBasis:       convertedCostBasis,
 		CurrentPrice:    convertedCurrentPrice,

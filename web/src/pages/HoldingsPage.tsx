@@ -14,6 +14,7 @@ import { formatErrorMessage } from '../utils/errorHandler';
 
 interface Holding {
   symbol: string;
+  name?: string;
   shares: number;
   costBasis: number;
   currentPrice: number;
