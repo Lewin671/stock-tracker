@@ -26,6 +26,7 @@ type DashboardMetrics struct {
 // AllocationItem represents a single allocation entry
 type AllocationItem struct {
 	Symbol     string  `json:"symbol"`
+	Name       string  `json:"name"`
 	Value      float64 `json:"value"`
 	Percentage float64 `json:"percentage"`
 }
@@ -206,6 +207,7 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 		// Add to allocation
 		allocation = append(allocation, AllocationItem{
 			Symbol:     holding.Symbol,
+			Name:       holding.Name,
 			Value:      holding.CurrentValue,
 			Percentage: 0, // Will calculate after we have total
 		})

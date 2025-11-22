@@ -167,12 +167,13 @@ const DashboardPage: React.FC = () => {
               <HistoricalPerformanceChart currency={currency} />
               <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
                 <h3 className="font-semibold text-lg mb-4">Allocation</h3>
-                <div className="h-[300px] flex items-center justify-center">
+                <div className="h-[400px]">
                   <AllocationPieChart
                     data={
                       isGroupedMetrics(metrics)
                         ? metrics.groups.map((g) => ({
                           symbol: g.groupName,
+                          name: g.groupName,
                           value: g.groupValue,
                           percentage: g.percentage,
                         }))

@@ -5,6 +5,7 @@ export type GroupingMode = 'assetStyle' | 'assetClass' | 'currency' | 'none';
 
 export interface AllocationItem {
   symbol: string;
+  name: string;
   value: number;
   percentage: number;
 }
