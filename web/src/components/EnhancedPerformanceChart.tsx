@@ -314,30 +314,7 @@ const EnhancedPerformanceChart: React.FC<EnhancedPerformanceChartProps> = ({
   return (
     <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <h3 className="font-semibold text-lg">Performance Trend</h3>
-          
-          {/* View Mode Toggle */}
-          <ToggleGroup.Root
-            type="single"
-            value={viewMode}
-            onValueChange={(value) => value && setViewMode(value as ViewMode)}
-            className="inline-flex bg-muted rounded-lg p-1"
-          >
-            <ToggleGroup.Item
-              value="absolute"
-              className="px-3 py-1 text-xs font-medium rounded-md transition-all data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm data-[state=off]:text-muted-foreground hover:text-foreground"
-            >
-              Value
-            </ToggleGroup.Item>
-            <ToggleGroup.Item
-              value="percentage"
-              className="px-3 py-1 text-xs font-medium rounded-md transition-all data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm data-[state=off]:text-muted-foreground hover:text-foreground"
-            >
-              %
-            </ToggleGroup.Item>
-          </ToggleGroup.Root>
-        </div>
+        <h3 className="font-semibold text-lg">Performance Trend</h3>
 
         <div className="flex items-center gap-4">
           {/* Chart Mode Toggle */}
