@@ -144,6 +144,16 @@ type yahooChartResponse struct {
 	} `json:"chart"`
 }
 
+// Eastmoney API response structures
+type eastmoneyResponse struct {
+	Data struct {
+		F58 string `json:"f58"` // 股票名称
+	} `json:"data"`
+	RC  int    `json:"rc"`  // 返回码，0 表示成功
+	RT  int    `json:"rt"`  // 响应类型
+	Msg string `json:"msg"` // 消息
+}
+
 
 
 // fetchFromYahooChart calls Yahoo Finance Chart API with the specified parameters
@@ -293,6 +303,123 @@ func (s *StockAPIService) extractHistoricalData(response *yahooChartResponse) ([
 	return historicalData, nil
 }
 
+// convertToEastmoneySecID converts Yahoo Finance format symbol to Eastmoney secid format
+// Example: 600000.SS -> 1.600000, 000001.SZ -> 0.000001
+func (s *StockAPIService) convertToEastmoneySecID(symbol string) (string, error) {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	
+	fmt.Printf("[StockAPI] Converting symbol to Eastmoney secid: %s\n", symbol)
+	
+	// Split symbol and suffix
+	parts := strings.Split(symbol, ".")
+	if len(parts) != 2 {
+		fmt.Printf("[StockAPI] ERROR: Invalid symbol format for Eastmoney conversion: %s\n", symbol)
+		return "", fmt.Errorf("invalid symbol format: %s", symbol)
+	}
+	
+	stockCode := parts[0]
+	suffix := parts[1]
+	
+	var marketCode string
+	switch suffix {
+	case "SS":
+		marketCode = "1" // Shanghai Stock Exchange
+	case "SZ":
+		marketCode = "0" // Shenzhen Stock Exchange
+	default:
+		fmt.Printf("[StockAPI] ERROR: Unsupported exchange suffix for Eastmoney: %s\n", suffix)
+		return "", fmt.Errorf("unsupported exchange suffix: %s", suffix)
+	}
+	
+	secid := fmt.Sprintf("%s.%s", marketCode, stockCode)
+	fmt.Printf("[StockAPI] Converted %s to Eastmoney secid: %s\n", symbol, secid)
+	
+	return secid, nil
+}
+
+// fetchStockNameFromEastmoney fetches stock name from Eastmoney API for Chinese stocks
+func (s *StockAPIService) fetchStockNameFromEastmoney(symbol string) (string, error) {
+	fmt.Printf("[StockAPI] Fetching stock name from Eastmoney for symbol: %s\n", symbol)
+	
+	// Convert symbol to Eastmoney secid format
+	secid, err := s.convertToEastmoneySecID(symbol)
+	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to convert symbol to secid: %v\n", err)
+		return "", err
+	}
+	
+	// Build request URL
+	url := fmt.Sprintf("http://push2.eastmoney.com/api/qt/stock/get?secid=%s&fields=f58", secid)
+	fmt.Printf("[StockAPI] Eastmoney HTTP GET: %s\n", url)
+	
+	// Create HTTP request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to create Eastmoney HTTP request: %v\n", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	
+	// Create a client with timeout
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	
+	// Execute request
+	startTime := time.Now()
+	resp, err := client.Do(req)
+	duration := time.Since(startTime)
+	
+	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Eastmoney HTTP request failed after %v: %v\n", duration, err)
+		return "", fmt.Errorf("%w: %v", ErrExternalAPI, err)
+	}
+	defer resp.Body.Close()
+	
+	fmt.Printf("[StockAPI] Eastmoney HTTP response received in %v, status: %d\n", duration, resp.StatusCode)
+	
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[StockAPI] ERROR: Eastmoney non-OK status code: %d\n", resp.StatusCode)
+		return "", fmt.Errorf("%w: status code %d", ErrExternalAPI, resp.StatusCode)
+	}
+	
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to read Eastmoney response body: %v\n", err)
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+	
+	fmt.Printf("[StockAPI] Eastmoney response body size: %d bytes\n", len(body))
+	
+	// Parse JSON response
+	var eastmoneyResp eastmoneyResponse
+	if err := json.Unmarshal(body, &eastmoneyResp); err != nil {
+		fmt.Printf("[StockAPI] ERROR: Failed to parse Eastmoney JSON response: %v\n", err)
+		fmt.Printf("[StockAPI] Response body preview: %s\n", string(body[:min(len(body), 500)]))
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	// Check return code
+	if eastmoneyResp.RC != 0 {
+		fmt.Printf("[StockAPI] ERROR: Eastmoney API returned error code: %d, message: %s\n", 
+			eastmoneyResp.RC, eastmoneyResp.Msg)
+		return "", fmt.Errorf("eastmoney API error: %s", eastmoneyResp.Msg)
+	}
+	
+	// Extract stock name
+	stockName := strings.TrimSpace(eastmoneyResp.Data.F58)
+	if stockName == "" {
+		fmt.Printf("[StockAPI] WARNING: Eastmoney returned empty stock name for %s\n", symbol)
+		return "", fmt.Errorf("empty stock name returned")
+	}
+	
+	fmt.Printf("[StockAPI] Successfully fetched stock name from Eastmoney: %s -> %s\n", symbol, stockName)
+	
+	return stockName, nil
+}
+
 
 
 
@@ -407,27 +534,109 @@ func (s *StockAPIService) GetStockInfo(symbol string) (*StockInfo, error) {
 		fmt.Printf("[StockAPI] Cache HIT for %s (price: %.2f)\n", symbol, cached.CurrentPrice)
 		return cached, nil
 	}
-	fmt.Printf("[StockAPI] Cache MISS for %s, fetching from Yahoo Finance\n", symbol)
+	fmt.Printf("[StockAPI] Cache MISS for %s, fetching from external APIs\n", symbol)
 	
-	// Fetch from Yahoo Finance Chart API
 	// Use a short time range (last 1 day) to get current price
 	endTime := time.Now()
 	startTime := endTime.AddDate(0, 0, -1)
 	
-	fmt.Printf("[StockAPI] Calling Yahoo Finance API for %s (period: %s to %s)\n", 
-		symbol, startTime.Format("2006-01-02"), endTime.Format("2006-01-02"))
+	// Check if it's a Chinese stock
+	isChinaStock := s.IsChinaStock(symbol)
 	
-	response, err := s.fetchFromYahooChart(symbol, startTime.Unix(), endTime.Unix())
-	if err != nil {
-		fmt.Printf("[StockAPI] ERROR: Yahoo Finance API call failed for %s: %v\n", symbol, err)
-		return nil, err
-	}
+	var info *StockInfo
 	
-	// Extract stock info from response
-	info, err := s.extractStockInfo(response)
-	if err != nil {
-		fmt.Printf("[StockAPI] ERROR: Failed to extract stock info for %s: %v\n", symbol, err)
-		return nil, err
+	if isChinaStock {
+		// For Chinese stocks, fetch from both Yahoo Finance and Eastmoney concurrently
+		fmt.Printf("[StockAPI] Chinese stock detected: %s, fetching from both Yahoo Finance and Eastmoney\n", symbol)
+		
+		// Create channels for concurrent API calls
+		type yahooResult struct {
+			info *StockInfo
+			err  error
+		}
+		type eastmoneyResult struct {
+			name string
+			err  error
+		}
+		
+		yahooChan := make(chan yahooResult, 1)
+		eastmoneyChan := make(chan eastmoneyResult, 1)
+		
+		// Fetch from Yahoo Finance concurrently
+		go func() {
+			fmt.Printf("[StockAPI] [Goroutine] Calling Yahoo Finance API for %s\n", symbol)
+			response, err := s.fetchFromYahooChart(symbol, startTime.Unix(), endTime.Unix())
+			if err != nil {
+				fmt.Printf("[StockAPI] [Goroutine] Yahoo Finance API call failed: %v\n", err)
+				yahooChan <- yahooResult{nil, err}
+				return
+			}
+			
+			stockInfo, err := s.extractStockInfo(response)
+			if err != nil {
+				fmt.Printf("[StockAPI] [Goroutine] Failed to extract stock info: %v\n", err)
+				yahooChan <- yahooResult{nil, err}
+				return
+			}
+			
+			fmt.Printf("[StockAPI] [Goroutine] Yahoo Finance fetch successful\n")
+			yahooChan <- yahooResult{stockInfo, nil}
+		}()
+		
+		// Fetch from Eastmoney concurrently
+		go func() {
+			fmt.Printf("[StockAPI] [Goroutine] Calling Eastmoney API for %s\n", symbol)
+			name, err := s.fetchStockNameFromEastmoney(symbol)
+			if err != nil {
+				fmt.Printf("[StockAPI] [Goroutine] Eastmoney API call failed: %v\n", err)
+				eastmoneyChan <- eastmoneyResult{"", err}
+				return
+			}
+			
+			fmt.Printf("[StockAPI] [Goroutine] Eastmoney fetch successful: %s\n", name)
+			eastmoneyChan <- eastmoneyResult{name, nil}
+		}()
+		
+		// Wait for both results
+		yahooRes := <-yahooChan
+		eastmoneyRes := <-eastmoneyChan
+		
+		// Yahoo Finance result is critical
+		if yahooRes.err != nil {
+			fmt.Printf("[StockAPI] ERROR: Yahoo Finance API call failed for %s: %v\n", symbol, yahooRes.err)
+			return nil, yahooRes.err
+		}
+		
+		info = yahooRes.info
+		
+		// Use Eastmoney name if available, otherwise fallback to Yahoo Finance name
+		if eastmoneyRes.err == nil && eastmoneyRes.name != "" {
+			fmt.Printf("[StockAPI] Using Eastmoney name: %s (replacing Yahoo name: %s)\n", 
+				eastmoneyRes.name, info.Name)
+			info.Name = eastmoneyRes.name
+		} else {
+			fmt.Printf("[StockAPI] WARNING: Eastmoney name fetch failed, falling back to Yahoo Finance name: %s (reason: %v)\n", 
+				info.Name, eastmoneyRes.err)
+		}
+		
+	} else {
+		// For non-Chinese stocks, use Yahoo Finance only
+		fmt.Printf("[StockAPI] Non-Chinese stock: %s, fetching from Yahoo Finance only\n", symbol)
+		fmt.Printf("[StockAPI] Calling Yahoo Finance API for %s (period: %s to %s)\n", 
+			symbol, startTime.Format("2006-01-02"), endTime.Format("2006-01-02"))
+		
+		response, err := s.fetchFromYahooChart(symbol, startTime.Unix(), endTime.Unix())
+		if err != nil {
+			fmt.Printf("[StockAPI] ERROR: Yahoo Finance API call failed for %s: %v\n", symbol, err)
+			return nil, err
+		}
+		
+		var err2 error
+		info, err2 = s.extractStockInfo(response)
+		if err2 != nil {
+			fmt.Printf("[StockAPI] ERROR: Failed to extract stock info for %s: %v\n", symbol, err2)
+			return nil, err2
+		}
 	}
 	
 	fmt.Printf("[StockAPI] Successfully fetched %s: price=%.2f, currency=%s, name=%s\n", 
