@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Loader2, DollarSign, Calendar, Hash, TrendingUp } from 'lucide-react';
+import { X, Loader2, DollarSign, Calendar, Hash, TrendingUp, Search } from 'lucide-react';
 import axiosInstance from '../api/axios';
 import AssetClassDialog from './AssetClassDialog';
 import { checkPortfolioExists, updatePortfolioMetadata } from '../api/portfolios';
@@ -62,6 +62,14 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showAssetClassDialog, setShowAssetClassDialog] = useState(false);
   const [pendingTransaction, setPendingTransaction] = useState<any>(null);
+  
+  // Stock search autocomplete state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (transaction) {
@@ -228,6 +236,68 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
     }
   };
 
+  // Search for stocks as user types
+  const searchStocks = async (query: string) => {
+    if (!query || query.length < 1) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    
+    try {
+      const response = await axiosInstance.get(`/api/stocks/search/${query.toUpperCase()}`);
+      setSearchResults([response.data]);
+      setShowSearchResults(true);
+    } catch (err: any) {
+      // If stock not found, clear results
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Handle symbol input change with debounce
+  const handleSymbolChange = (value: string) => {
+    const upperValue = value.toUpperCase();
+    setSearchQuery(upperValue);
+    handleChange('symbol', upperValue);
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout for search
+    searchTimeoutRef.current = setTimeout(() => {
+      searchStocks(upperValue);
+    }, 300);
+  };
+
+  // Handle selecting a stock from search results
+  const handleSelectStock = (stock: any) => {
+    setFormData(prev => ({ ...prev, symbol: stock.symbol }));
+    setSearchQuery(stock.symbol);
+    setShowSearchResults(false);
+    setSearchResults([]);
+  };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const handleAssetClassSave = async (assetStyleId: string, assetClass: string) => {
     if (!pendingTransaction) return;
 
@@ -335,7 +405,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
 
                 {/* Symbol - only show for stocks */}
                 {!isCashTransaction && (
-                  <div>
+                  <div className="relative" ref={searchInputRef}>
                     <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Symbol *
                     </label>
@@ -345,13 +415,56 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
                         id="symbol"
                         type="text"
                         value={formData.symbol}
-                        onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
-                        className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                        onChange={(e) => handleSymbolChange(e.target.value)}
+                        onFocus={() => {
+                          if (searchResults.length > 0) {
+                            setShowSearchResults(true);
+                          }
+                        }}
+                        className={`w-full pl-10 pr-10 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                           }`}
-                        placeholder="AAPL"
+                        placeholder="AAPL, 600000.SS"
                         disabled={!!transaction}
+                        autoComplete="off"
                       />
+                      {searchLoading && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 animate-spin" />
+                      )}
                     </div>
+                    
+                    {/* Search Results Dropdown */}
+                    {showSearchResults && searchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {searchResults.map((stock, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleSelectStock(stock)}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border-b border-gray-200 dark:border-gray-600 last:border-b-0"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-semibold text-gray-900 dark:text-white">
+                                  {stock.symbol}
+                                </div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {stock.name}
+                                </div>
+                              </div>
+                              <div className="text-right ml-4">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {stock.currentPrice?.toFixed(2)}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {stock.currency}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
                     {errors.symbol && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol}</p>}
                   </div>
                 )}
