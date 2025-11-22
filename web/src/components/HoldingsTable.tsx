@@ -32,6 +32,15 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
     return symbol;
   };
 
+  // Sort holdings: non-cash first, then cash at the bottom
+  const sortedHoldings = [...holdings].sort((a, b) => {
+    const aIsCash = isCashSymbol(a.symbol);
+    const bIsCash = isCashSymbol(b.symbol);
+    if (aIsCash && !bIsCash) return 1;
+    if (!aIsCash && bIsCash) return -1;
+    return 0;
+  });
+
   const formatCurrency = (value: number, curr: string) => {
     const symbol = curr === 'USD' ? '$' : '¥';
     return `${symbol}${value.toFixed(2)}`;
@@ -58,7 +67,7 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {holdings.map((holding) => {
+            {sortedHoldings.map((holding) => {
               const isCash = isCashSymbol(holding.symbol);
               return (
                 <tr key={holding.symbol} className="hover:bg-muted/50 transition-colors">
