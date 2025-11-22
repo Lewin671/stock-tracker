@@ -27,6 +27,7 @@ interface TransactionDialogProps {
 }
 
 interface TransactionFormData {
+  assetType: 'stock' | 'cash';
   symbol: string;
   action: 'buy' | 'sell';
   shares: string;
@@ -45,6 +46,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
 }) => {
   const { showSuccess, showError } = useToast();
   const [formData, setFormData] = useState<TransactionFormData>({
+    assetType: 'stock',
     symbol: symbol || '',
     action: 'buy',
     shares: '',
@@ -53,6 +55,8 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
     currency: 'USD',
     fees: '',
   });
+  
+  const isCashTransaction = formData.assetType === 'cash';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,7 +66,9 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
   useEffect(() => {
     if (transaction) {
       // Edit mode - populate form with transaction data
+      const isCash = transaction.symbol === 'CASH_USD' || transaction.symbol === 'CASH_RMB';
       setFormData({
+        assetType: isCash ? 'cash' : 'stock',
         symbol: transaction.symbol,
         action: transaction.action,
         shares: transaction.shares.toString(),
@@ -73,25 +79,43 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
       });
     } else if (symbol) {
       // Add mode with pre-filled symbol
-      setFormData(prev => ({ ...prev, symbol }));
+      const isCash = symbol === 'CASH_USD' || symbol === 'CASH_RMB';
+      setFormData(prev => ({ 
+        ...prev, 
+        symbol,
+        assetType: isCash ? 'cash' : 'stock'
+      }));
     }
   }, [transaction, symbol]);
+  
+  // Update symbol when asset type or currency changes for cash
+  useEffect(() => {
+    if (formData.assetType === 'cash') {
+      const cashSymbol = formData.currency === 'USD' ? 'CASH_USD' : 'CASH_RMB';
+      if (formData.symbol !== cashSymbol) {
+        setFormData(prev => ({ ...prev, symbol: cashSymbol, price: '1.0' }));
+      }
+    }
+  }, [formData.assetType, formData.currency]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.symbol.trim()) {
+    if (!isCashTransaction && !formData.symbol.trim()) {
       newErrors.symbol = 'Symbol is required';
     }
 
     const shares = parseFloat(formData.shares);
     if (!formData.shares || isNaN(shares) || shares <= 0) {
-      newErrors.shares = 'Shares must be a positive number';
+      newErrors.shares = isCashTransaction ? 'Amount must be a positive number' : 'Shares must be a positive number';
     }
 
-    const price = parseFloat(formData.price);
-    if (!formData.price || isNaN(price) || price <= 0) {
-      newErrors.price = 'Price must be a positive number';
+    // For cash, price is always 1.0, skip validation
+    if (!isCashTransaction) {
+      const price = parseFloat(formData.price);
+      if (!formData.price || isNaN(price) || price <= 0) {
+        newErrors.price = 'Price must be a positive number';
+      }
     }
 
     if (!formData.date) {
@@ -131,7 +155,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
         symbol: formData.symbol.toUpperCase(),
         action: formData.action,
         shares: parseFloat(formData.shares),
-        price: parseFloat(formData.price),
+        price: isCashTransaction ? 1.0 : parseFloat(formData.price),
         date: new Date(formData.date).toISOString(),
         currency: formData.currency,
         fees: formData.fees ? parseFloat(formData.fees) : 0,
@@ -144,20 +168,28 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
         onSuccess();
         handleClose();
       } else {
-        // Check if portfolio exists for this symbol
-        const portfolioCheck = await checkPortfolioExists(payload.symbol);
-
-        if (!portfolioCheck.exists) {
-          // Portfolio doesn't exist, show asset classification dialog
-          setPendingTransaction(payload);
-          setShowAssetClassDialog(true);
-          setLoading(false);
-        } else {
-          // Portfolio exists, proceed with transaction
+        // For cash transactions, skip asset classification dialog (backend handles it automatically)
+        if (isCashTransaction) {
           await axiosInstance.post('/api/portfolio/transactions', payload);
           showSuccess('Transaction added', `${payload.symbol} transaction has been added`);
           onSuccess();
           handleClose();
+        } else {
+          // Check if portfolio exists for this symbol
+          const portfolioCheck = await checkPortfolioExists(payload.symbol);
+
+          if (!portfolioCheck.exists) {
+            // Portfolio doesn't exist, show asset classification dialog
+            setPendingTransaction(payload);
+            setShowAssetClassDialog(true);
+            setLoading(false);
+          } else {
+            // Portfolio exists, proceed with transaction
+            await axiosInstance.post('/api/portfolio/transactions', payload);
+            showSuccess('Transaction added', `${payload.symbol} transaction has been added`);
+            onSuccess();
+            handleClose();
+          }
         }
       }
     } catch (err: any) {
@@ -170,6 +202,7 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
 
   const handleClose = () => {
     setFormData({
+      assetType: 'stock',
       symbol: '',
       action: 'buy',
       shares: '',
@@ -269,31 +302,64 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Symbol */}
-                <div>
-                  <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Symbol *
-                  </label>
-                  <div className="relative">
-                    <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    <input
-                      id="symbol"
-                      type="text"
-                      value={formData.symbol}
-                      onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
-                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-                        }`}
-                      placeholder="AAPL"
-                      disabled={!!transaction}
-                    />
+                {/* Asset Type */}
+                {!transaction && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Asset Type *
+                    </label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          value="stock"
+                          checked={formData.assetType === 'stock'}
+                          onChange={(e) => handleChange('assetType', e.target.value)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Stock/ETF</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          value="cash"
+                          checked={formData.assetType === 'cash'}
+                          onChange={(e) => handleChange('assetType', e.target.value)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Cash</span>
+                      </label>
+                    </div>
                   </div>
-                  {errors.symbol && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol}</p>}
-                </div>
+                )}
+
+                {/* Symbol - only show for stocks */}
+                {!isCashTransaction && (
+                  <div>
+                    <label htmlFor="symbol" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Symbol *
+                    </label>
+                    <div className="relative">
+                      <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                      <input
+                        id="symbol"
+                        type="text"
+                        value={formData.symbol}
+                        onChange={(e) => handleChange('symbol', e.target.value.toUpperCase())}
+                        className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.symbol ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                          }`}
+                        placeholder="AAPL"
+                        disabled={!!transaction}
+                      />
+                    </div>
+                    {errors.symbol && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol}</p>}
+                  </div>
+                )}
 
                 {/* Action */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Action *
+                    {isCashTransaction ? 'Transaction Type *' : 'Action *'}
                   </label>
                   <div className="flex gap-4">
                     <label className="flex items-center">
@@ -304,7 +370,9 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
                         onChange={(e) => handleChange('action', e.target.value)}
                         className="mr-2"
                       />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Buy</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {isCashTransaction ? 'Deposit' : 'Buy'}
+                      </span>
                     </label>
                     <label className="flex items-center">
                       <input
@@ -314,18 +382,24 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
                         onChange={(e) => handleChange('action', e.target.value)}
                         className="mr-2"
                       />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Sell</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {isCashTransaction ? 'Withdraw' : 'Sell'}
+                      </span>
                     </label>
                   </div>
                 </div>
 
-                {/* Shares */}
+                {/* Shares / Amount */}
                 <div>
                   <label htmlFor="shares" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Shares *
+                    {isCashTransaction ? 'Amount *' : 'Shares *'}
                   </label>
                   <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    {isCashTransaction ? (
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    ) : (
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    )}
                     <input
                       id="shares"
                       type="number"
@@ -334,32 +408,34 @@ const TransactionDialog: React.FC<TransactionDialogProps> = ({
                       onChange={(e) => handleChange('shares', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.shares ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                         }`}
-                      placeholder="10"
+                      placeholder={isCashTransaction ? '1000.00' : '10'}
                     />
                   </div>
                   {errors.shares && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.shares}</p>}
                 </div>
 
-                {/* Price */}
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Price *
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    <input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={(e) => handleChange('price', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.price ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-                        }`}
-                      placeholder="150.50"
-                    />
+                {/* Price - only show for stocks */}
+                {!isCashTransaction && (
+                  <div>
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Price *
+                    </label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                      <input
+                        id="price"
+                        type="number"
+                        step="0.01"
+                        value={formData.price}
+                        onChange={(e) => handleChange('price', e.target.value)}
+                        className={`w-full pl-10 pr-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.price ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
+                          }`}
+                        placeholder="150.50"
+                      />
+                    </div>
+                    {errors.price && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>}
                   </div>
-                  {errors.price && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>}
-                </div>
+                )}
 
                 {/* Date */}
                 <div>

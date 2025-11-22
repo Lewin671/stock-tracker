@@ -95,6 +95,33 @@ func (s *StockAPIService) IsChinaStock(symbol string) bool {
 	return strings.HasSuffix(symbol, ".SS") || strings.HasSuffix(symbol, ".SZ")
 }
 
+// IsCashSymbol checks if a symbol represents cash
+func (s *StockAPIService) IsCashSymbol(symbol string) bool {
+	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	return symbol == "CASH_USD" || symbol == "CASH_RMB"
+}
+
+// getCashInfo returns fixed info for cash holdings
+func (s *StockAPIService) getCashInfo(symbol string) *StockInfo {
+	var currency string
+	var name string
+	
+	if symbol == "CASH_USD" {
+		currency = "USD"
+		name = "Cash - USD"
+	} else {
+		currency = "CNY" // RMB uses CNY currency code
+		name = "Cash - RMB"
+	}
+	
+	return &StockInfo{
+		Symbol:       symbol,
+		Name:         name,
+		CurrentPrice: 1.0,
+		Currency:     currency,
+	}
+}
+
 // Yahoo Finance API response structures
 type yahooChartResponse struct {
 	Chart struct {
@@ -367,6 +394,12 @@ func (s *StockAPIService) GetStockInfo(symbol string) (*StockInfo, error) {
 	if symbol == "" {
 		fmt.Printf("[StockAPI] ERROR: Empty symbol provided\n")
 		return nil, ErrInvalidSymbol
+	}
+	
+	// Check if it's a cash symbol
+	if s.IsCashSymbol(symbol) {
+		fmt.Printf("[StockAPI] Cash symbol detected: %s, returning fixed price\n", symbol)
+		return s.getCashInfo(symbol), nil
 	}
 	
 	// Check cache first

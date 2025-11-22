@@ -31,10 +31,22 @@ const EditAssetMetadataDialog: React.FC<EditAssetMetadataDialogProps> = ({
   const [loadingStyles, setLoadingStyles] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if the portfolio is a cash holding
+  const isCashSymbol = (symbol: string): boolean => {
+    return symbol === 'CASH_USD' || symbol === 'CASH_RMB';
+  };
+
+  const isCash = portfolio ? isCashSymbol(portfolio.symbol) : false;
+
   useEffect(() => {
     if (open && portfolio) {
       loadAssetStyles();
-      setSelectedClass(portfolio.assetClass || 'Stock');
+      // For cash, always set to "Cash and Equivalents"
+      if (isCashSymbol(portfolio.symbol)) {
+        setSelectedClass('Cash and Equivalents');
+      } else {
+        setSelectedClass(portfolio.assetClass || 'Stock');
+      }
     }
   }, [open, portfolio]);
 
@@ -175,13 +187,19 @@ const EditAssetMetadataDialog: React.FC<EditAssetMetadataDialogProps> = ({
                     id="assetClass"
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value as AssetClass)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isCash}
                   >
                     <option value="Stock">Stock</option>
                     <option value="ETF">ETF</option>
                     <option value="Bond">Bond</option>
                     <option value="Cash and Equivalents">Cash and Equivalents</option>
                   </select>
+                  {isCash && (
+                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      Cash holdings must be classified as "Cash and Equivalents"
+                    </p>
+                  )}
                 </div>
 
                 {/* Actions */}

@@ -284,6 +284,11 @@ func (s *PortfolioService) getOrCreatePortfolio(userID primitive.ObjectID, symbo
 		UpdatedAt: time.Now(),
 	}
 
+	// Automatically set Asset Class for cash holdings
+	if s.stockService.IsCashSymbol(symbol) {
+		portfolio.AssetClass = "Cash and Equivalents"
+	}
+
 	_, err = collection.InsertOne(ctx, portfolio)
 	if err != nil {
 		return primitive.NilObjectID, fmt.Errorf("failed to create portfolio: %w", err)
@@ -481,7 +486,12 @@ func (s *PortfolioService) calculateHolding(symbol string, transactions []models
 	currentValue := convertedCurrentPrice * totalShares
 	gainLoss := currentValue - convertedCostBasis
 	gainLossPercent := 0.0
-	if convertedCostBasis > 0 {
+	
+	// For cash holdings, gain/loss is always 0
+	if s.stockService.IsCashSymbol(symbol) {
+		gainLoss = 0
+		gainLossPercent = 0
+	} else if convertedCostBasis > 0 {
 		gainLossPercent = (gainLoss / convertedCostBasis) * 100
 	}
 

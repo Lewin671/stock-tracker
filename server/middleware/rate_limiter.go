@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -54,14 +57,14 @@ func (rl *rateLimiter) cleanup() {
 	}
 }
 
-func (rl *rateLimiter) allow(ip string) bool {
+func (rl *rateLimiter) allow(key string) (allowed bool, remaining int, resetTime time.Time) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	
 	now := time.Now()
 	
-	// Get existing timestamps for this IP
-	timestamps, exists := rl.requests[ip]
+	// Get existing timestamps for this key
+	timestamps, exists := rl.requests[key]
 	if !exists {
 		timestamps = []time.Time{}
 	}
@@ -74,16 +77,26 @@ func (rl *rateLimiter) allow(ip string) bool {
 		}
 	}
 	
+	// Calculate remaining requests
+	remaining = rl.limit - len(validTimestamps)
+	
+	// Calculate reset time (oldest timestamp + window)
+	if len(validTimestamps) > 0 {
+		resetTime = validTimestamps[0].Add(rl.window)
+	} else {
+		resetTime = now.Add(rl.window)
+	}
+	
 	// Check if limit is exceeded
 	if len(validTimestamps) >= rl.limit {
-		return false
+		return false, 0, resetTime
 	}
 	
 	// Add current timestamp
 	validTimestamps = append(validTimestamps, now)
-	rl.requests[ip] = validTimestamps
+	rl.requests[key] = validTimestamps
 	
-	return true
+	return true, remaining - 1, resetTime
 }
 
 // RateLimitMiddleware creates a rate limiting middleware
@@ -91,13 +104,31 @@ func RateLimitMiddleware(limit int, window time.Duration) gin.HandlerFunc {
 	limiter := newRateLimiter(limit, window)
 	
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		// Use user ID if authenticated, otherwise use IP
+		key := c.ClientIP()
+		if userID, exists := c.Get("userID"); exists {
+			key = fmt.Sprintf("user:%v", userID)
+		}
 		
-		if !limiter.allow(ip) {
+		allowed, remaining, resetTime := limiter.allow(key)
+		
+		// Add rate limit headers
+		c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		c.Header("X-RateLimit-Reset", strconv.FormatInt(resetTime.Unix(), 10))
+		
+		if !allowed {
+			retryAfter := int(time.Until(resetTime).Seconds())
+			if retryAfter < 0 {
+				retryAfter = 0
+			}
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+			
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": gin.H{
 					"code":    "RATE_LIMIT_EXCEEDED",
-					"message": "Too many requests. Please try again later.",
+					"message": fmt.Sprintf("Too many requests. Please try again in %d seconds.", retryAfter),
+					"retryAfter": retryAfter,
 				},
 			})
 			c.Abort()
@@ -108,12 +139,26 @@ func RateLimitMiddleware(limit int, window time.Duration) gin.HandlerFunc {
 	}
 }
 
-// GlobalRateLimiter creates a rate limiter with 100 requests per minute
-func GlobalRateLimiter() gin.HandlerFunc {
-	return RateLimitMiddleware(100, 1*time.Minute)
+// getEnvInt reads an integer from environment variable with a default value
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
 }
 
-// AuthRateLimiter creates a stricter rate limiter for auth endpoints (10 requests per minute)
+// GlobalRateLimiter creates a rate limiter with configurable requests per minute
+// Default: 500 requests per minute (can be overridden with RATE_LIMIT_GLOBAL env var)
+func GlobalRateLimiter() gin.HandlerFunc {
+	limit := getEnvInt("RATE_LIMIT_GLOBAL", 500)
+	return RateLimitMiddleware(limit, 1*time.Minute)
+}
+
+// AuthRateLimiter creates a stricter rate limiter for auth endpoints
+// Default: 30 requests per minute (can be overridden with RATE_LIMIT_AUTH env var)
 func AuthRateLimiter() gin.HandlerFunc {
-	return RateLimitMiddleware(10, 1*time.Minute)
+	limit := getEnvInt("RATE_LIMIT_AUTH", 30)
+	return RateLimitMiddleware(limit, 1*time.Minute)
 }

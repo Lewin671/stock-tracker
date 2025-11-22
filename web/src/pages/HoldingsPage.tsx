@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '../api/axios';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Wallet } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import HoldingsTable from '../components/HoldingsTable';
 import TransactionDialog from '../components/TransactionDialog';
+import CashTransactionDialog from '../components/CashTransactionDialog';
 import TransactionsList from '../components/TransactionsList';
 import EditAssetMetadataDialog from '../components/EditAssetMetadataDialog';
 import { getPortfolio, updatePortfolioMetadata, Portfolio } from '../api/portfolios';
@@ -43,6 +44,7 @@ const HoldingsPage: React.FC = () => {
 
   // Dialog states
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
+  const [cashTransactionDialogOpen, setCashTransactionDialogOpen] = useState(false);
   const [transactionsListOpen, setTransactionsListOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | undefined>(undefined);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
@@ -81,6 +83,10 @@ const HoldingsPage: React.FC = () => {
     setSelectedSymbol(undefined);
     setEditingTransaction(undefined);
     setTransactionDialogOpen(true);
+  };
+
+  const handleAddCash = () => {
+    setCashTransactionDialogOpen(true);
   };
 
   const handleViewTransactions = (symbol: string) => {
@@ -175,6 +181,22 @@ const HoldingsPage: React.FC = () => {
               </ToggleGroup.Item>
             </ToggleGroup.Root>
           </div>
+
+          <button
+            onClick={handleAddCash}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors text-sm font-medium"
+          >
+            <Wallet className="h-4 w-4" />
+            Add Cash
+          </button>
+
+          <button
+            onClick={handleAddTransaction}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Add Transaction
+          </button>
         </div>
       </div>
 
@@ -195,16 +217,7 @@ const HoldingsPage: React.FC = () => {
       ) : (
         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
           <div className="p-6 border-b border-border">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Your Holdings</h3>
-              <button
-                onClick={handleAddTransaction}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Add Transaction
-              </button>
-            </div>
+            <h3 className="text-lg font-semibold">Your Holdings</h3>
           </div>
 
           {holdings.length === 0 ? (
@@ -236,6 +249,13 @@ const HoldingsPage: React.FC = () => {
         onSuccess={handleTransactionSuccess}
         symbol={selectedSymbol}
         transaction={editingTransaction}
+      />
+
+      {/* Cash Transaction Dialog */}
+      <CashTransactionDialog
+        open={cashTransactionDialogOpen}
+        onClose={() => setCashTransactionDialogOpen(false)}
+        onSuccess={handleTransactionSuccess}
       />
 
       {/* Transactions List Dialog */}

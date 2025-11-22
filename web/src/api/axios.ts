@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
@@ -9,6 +9,12 @@ const axiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Track retry attempts
+interface RetryConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+  _retryCount?: number;
+}
 
 // Request interceptor to attach JWT token
 axiosInstance.interceptors.request.use(
@@ -29,7 +35,9 @@ axiosInstance.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error: AxiosError) => {
+    const config = error.config as RetryConfig;
+    
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
@@ -40,11 +48,41 @@ axiosInstance.interceptors.response.use(
         window.location.href = '/login';
       }
       
+      // Handle rate limiting with automatic retry
+      if (status === 429) {
+        const retryAfter = error.response.headers['retry-after'];
+        const errorData = data as any;
+        const retrySeconds = errorData?.error?.retryAfter || parseInt(retryAfter || '5', 10);
+        
+        // Only retry once automatically
+        if (!config._retry && config) {
+          config._retry = true;
+          config._retryCount = (config._retryCount || 0) + 1;
+          
+          // Wait for the specified time before retrying
+          const waitTime = Math.min(retrySeconds * 1000, 10000); // Max 10 seconds
+          
+          console.log(`Rate limited. Retrying in ${waitTime / 1000} seconds...`);
+          
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          
+          return axiosInstance(config);
+        }
+        
+        // If retry failed or already retried, return user-friendly error
+        return Promise.reject({
+          status,
+          message: `请求过于频繁，请在 ${retrySeconds} 秒后重试`,
+          code: 'RATE_LIMIT_EXCEEDED',
+          retryAfter: retrySeconds,
+        });
+      }
+      
       // Return formatted error
       return Promise.reject({
         status,
-        message: data?.error?.message || 'An error occurred',
-        code: data?.error?.code || 'UNKNOWN_ERROR',
+        message: (data as any)?.error?.message || 'An error occurred',
+        code: (data as any)?.error?.code || 'UNKNOWN_ERROR',
       });
     } else if (error.request) {
       // Request made but no response received

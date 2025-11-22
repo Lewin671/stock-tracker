@@ -79,6 +79,23 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
     }
   };
 
+  const isCashSymbol = (symbol: string): boolean => {
+    return symbol === 'CASH_USD' || symbol === 'CASH_RMB';
+  };
+
+  const getCashDisplayName = (symbol: string): string => {
+    if (symbol === 'CASH_USD') return 'Cash - USD (现金 - 美元)';
+    if (symbol === 'CASH_RMB') return 'Cash - RMB (现金 - 人民币)';
+    return symbol;
+  };
+
+  const getActionLabel = (action: string, isCash: boolean): string => {
+    if (isCash) {
+      return action === 'buy' ? 'Deposit (存入)' : 'Withdraw (取出)';
+    }
+    return action === 'buy' ? 'Buy' : 'Sell';
+  };
+
   const formatCurrency = (value: number, currency: string) => {
     const symbol = currency === 'USD' ? '$' : '¥';
     return `${symbol}${value.toFixed(2)}`;
@@ -104,7 +121,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Transactions for {symbol}
+                  Transactions for {isCashSymbol(symbol) ? getCashDisplayName(symbol) : symbol}
                 </Dialog.Title>
                 <Dialog.Close asChild>
                   <button
@@ -132,83 +149,92 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {transactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            {transaction.action === 'buy' ? (
-                              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
-                            )}
-                            <span
-                              className={`text-sm font-semibold uppercase ${
-                                transaction.action === 'buy' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                              }`}
-                            >
-                              {transaction.action}
-                            </span>
-                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatDate(transaction.date)}
-                            </span>
-                          </div>
+                  {transactions.map((transaction) => {
+                    const isCash = isCashSymbol(transaction.symbol);
+                    return (
+                      <div
+                        key={transaction.id}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              {transaction.action === 'buy' ? (
+                                <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                              )}
+                              <span
+                                className={`text-sm font-semibold ${
+                                  transaction.action === 'buy' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                }`}
+                              >
+                                {getActionLabel(transaction.action, isCash)}
+                              </span>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">
+                                {formatDate(transaction.date)}
+                              </span>
+                            </div>
 
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <span className="text-gray-500 dark:text-gray-400">Shares:</span>
-                              <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                                {transaction.shares.toFixed(2)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 dark:text-gray-400">Price:</span>
-                              <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                                {formatCurrency(transaction.price, transaction.currency)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 dark:text-gray-400">Total:</span>
-                              <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                                {formatCurrency(
-                                  transaction.shares * transaction.price,
-                                  transaction.currency
-                                )}
-                              </span>
-                            </div>
-                            {transaction.fees && transaction.fees > 0 && (
+                            <div className="grid grid-cols-2 gap-3 text-sm">
                               <div>
-                                <span className="text-gray-500 dark:text-gray-400">Fees:</span>
+                                <span className="text-gray-500 dark:text-gray-400">
+                                  {isCash ? 'Amount:' : 'Shares:'}
+                                </span>
                                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                                  {formatCurrency(transaction.fees, transaction.currency)}
+                                  {isCash ? formatCurrency(transaction.shares, transaction.currency) : transaction.shares.toFixed(2)}
                                 </span>
                               </div>
-                            )}
+                              {!isCash && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400">Price:</span>
+                                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                                    {formatCurrency(transaction.price, transaction.currency)}
+                                  </span>
+                                </div>
+                              )}
+                              {!isCash && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400">Total:</span>
+                                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                                    {formatCurrency(
+                                      transaction.shares * transaction.price,
+                                      transaction.currency
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {transaction.fees && transaction.fees > 0 && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400">Fees:</span>
+                                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                                    {formatCurrency(transaction.fees, transaction.currency)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              onClick={() => onEdit(transaction)}
+                              className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
+                              title="Edit transaction"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(transaction.id)}
+                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
+                              title="Delete transaction"
+                            >
+                              <Trash className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => onEdit(transaction)}
-                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
-                            title="Edit transaction"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(transaction.id)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
-                            title="Delete transaction"
-                          >
-                            <Trash className="h-4 w-4" />
-                          </button>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
