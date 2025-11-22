@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PieChart, LineChart, List, Menu } from 'lucide-react';
+import { LayoutDashboard, PieChart, LineChart, List, Menu, TrendingUp } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 import UserMenu from '../UserMenu';
 
@@ -14,6 +14,7 @@ const getPageTitle = (pathname: string): string => {
         '/dashboard': 'Dashboard',
         '/holdings': 'Holdings',
         '/performance': 'Performance',
+        '/backtest': 'Backtest',
         '/watchlist': 'Watchlist',
         '/search': 'Search',
         '/asset-styles': 'Asset Styles',
@@ -30,6 +31,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
         { name: 'Dashboard', href: '/', icon: LayoutDashboard },
         { name: 'Holdings', href: '/holdings', icon: PieChart },
         { name: 'Performance', href: '/performance', icon: LineChart },
+        { name: 'Backtest', href: '/backtest', icon: TrendingUp },
         { name: 'Watchlist', href: '/watchlist', icon: List },
     ];
 

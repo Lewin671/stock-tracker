@@ -42,6 +42,7 @@ func main() {
 	currencyService := services.NewCurrencyService()
 	portfolioService := services.NewPortfolioService(stockService, currencyService)
 	analyticsService := services.NewAnalyticsService(portfolioService, currencyService, stockService)
+	backtestService := services.NewBacktestService(portfolioService, analyticsService, currencyService, stockService)
 	
 	// Start cache cleanup for stock service (run every 10 minutes)
 	stockService.StartCacheCleanup(10 * time.Minute)
@@ -101,6 +102,7 @@ func main() {
 	routes.SetupCurrencyRoutes(router, currencyService)
 	routes.SetupAnalyticsRoutes(router, analyticsService, authService)
 	routes.SetupAssetStyleRoutes(router, authService)
+	routes.SetupBacktestRoutes(router, backtestService, authService)
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

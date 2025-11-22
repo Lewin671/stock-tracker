@@ -657,7 +657,7 @@ func (s *StockAPIService) GetHistoricalData(symbol string, period string) ([]His
 	}
 	
 	// Validate period
-	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true}
+	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true, "ALL": true}
 	if !validPeriods[period] {
 		return nil, ErrInvalidPeriod
 	}
@@ -683,6 +683,8 @@ func (s *StockAPIService) GetHistoricalData(symbol string, period string) ([]His
 		startTime = endTime.AddDate(0, -6, 0)
 	case "1Y":
 		startTime = endTime.AddDate(-1, 0, 0)
+	case "ALL":
+		startTime = endTime.AddDate(-10, 0, 0)
 	}
 	
 	// Fetch from Yahoo Finance Chart API

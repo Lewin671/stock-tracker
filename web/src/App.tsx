@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import HoldingsPage from './pages/HoldingsPage';
 import PerformancePage from './pages/PerformancePage';
+import BacktestPage from './pages/BacktestPage';
 import WatchlistPage from './pages/WatchlistPage';
 import SearchPage from './pages/SearchPage';
 import AssetStyleManagementPage from './pages/AssetStyleManagementPage';
@@ -45,6 +46,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <PerformancePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/backtest"
+                  element={
+                    <ProtectedRoute>
+                      <BacktestPage />
                     </ProtectedRoute>
                   }
                 />
