@@ -147,13 +147,13 @@ func (h *AnalyticsHandler) GetPerformance(c *gin.Context) {
 	// Get period from query parameter (default to 1M)
 	period := c.DefaultQuery("period", "1M")
 	
-	// Validate period
-	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true}
+	// Validate period (now including ALL)
+	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true, "ALL": true}
 	if !validPeriods[period] {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": gin.H{
 				"code":    "VALIDATION_ERROR",
-				"message": "Invalid period parameter. Must be 1M, 3M, 6M, or 1Y",
+				"message": "Invalid period parameter. Must be 1M, 3M, 6M, 1Y, or ALL",
 			},
 		})
 		return
@@ -173,9 +173,11 @@ func (h *AnalyticsHandler) GetPerformance(c *gin.Context) {
 		return
 	}
 
-	// Get historical performance
-	performance, err := h.analyticsService.GetHistoricalPerformance(userID, period, currency)
+	// Get historical performance with metrics
+	response, err := h.analyticsService.GetHistoricalPerformanceWithMetrics(userID, period, currency)
 	if err != nil {
+		// Log the detailed error for debugging
+		fmt.Printf("Error fetching historical performance for user %s: %v\n", userID.Hex(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"code":    "INTERNAL_SERVER_ERROR",
@@ -185,10 +187,16 @@ func (h *AnalyticsHandler) GetPerformance(c *gin.Context) {
 		})
 		return
 	}
+	
+	// Handle case where no data is available
+	if response.Performance == nil || len(response.Performance) == 0 {
+		fmt.Printf("No performance data available for user %s, period %s\n", userID.Hex(), period)
+		// Return empty response with zero metrics
+		response.Performance = []services.PerformanceDataPoint{}
+		if response.Metrics == nil {
+			response.Metrics = &services.PerformanceMetrics{}
+		}
+	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"period":      period,
-		"currency":    currency,
-		"performance": performance,
-	})
+	c.JSON(http.StatusOK, response)
 }

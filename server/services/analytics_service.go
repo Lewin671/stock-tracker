@@ -32,8 +32,59 @@ type AllocationItem struct {
 
 // PerformanceDataPoint represents a time series data point
 type PerformanceDataPoint struct {
-	Date  time.Time `json:"date"`
-	Value float64   `json:"value"`
+	Date             time.Time `json:"date"`
+	Value            float64   `json:"value"`
+	PercentageReturn float64   `json:"percentageReturn"` // Percentage from start
+	DayChange        float64   `json:"dayChange"`        // Day-over-day change
+	DayChangePercent float64   `json:"dayChangePercent"` // Day-over-day %
+}
+
+// PerformanceMetrics represents comprehensive performance metrics
+type PerformanceMetrics struct {
+	TotalReturn  ReturnMetric   `json:"totalReturn"`
+	PeriodReturn ReturnMetric   `json:"periodReturn"`
+	BestDay      DayMetric      `json:"bestDay"`
+	WorstDay     DayMetric      `json:"worstDay"`
+	MaxDrawdown  DrawdownMetric `json:"maxDrawdown"`
+	RecoveryTime RecoveryMetric `json:"recoveryTime"`
+}
+
+// ReturnMetric represents return in both absolute and percentage terms
+type ReturnMetric struct {
+	Absolute   float64 `json:"absolute"`
+	Percentage float64 `json:"percentage"`
+}
+
+// DayMetric represents a single day's performance
+type DayMetric struct {
+	Date          time.Time `json:"date"`
+	Change        float64   `json:"change"`
+	ChangePercent float64   `json:"changePercent"`
+}
+
+// DrawdownMetric represents maximum drawdown information
+type DrawdownMetric struct {
+	Percentage  float64   `json:"percentage"`
+	Absolute    float64   `json:"absolute"`
+	PeakDate    time.Time `json:"peakDate"`
+	TroughDate  time.Time `json:"troughDate"`
+	PeakValue   float64   `json:"peakValue"`
+	TroughValue float64   `json:"troughValue"`
+}
+
+// RecoveryMetric represents recovery time information
+type RecoveryMetric struct {
+	Status      string  `json:"status"` // "recovered" or "in_drawdown"
+	Days        int     `json:"days"`
+	AverageDays float64 `json:"averageDays"`
+}
+
+// PerformanceResponse represents the complete performance response with data and metrics
+type PerformanceResponse struct {
+	Period      string                   `json:"period"`
+	Currency    string                   `json:"currency"`
+	Performance []PerformanceDataPoint   `json:"performance"`
+	Metrics     *PerformanceMetrics      `json:"metrics"`
 }
 
 // GroupedHolding represents holdings grouped by a dimension
@@ -199,12 +250,42 @@ func (s *AnalyticsService) GetDashboardMetrics(userID primitive.ObjectID, curren
 	}, nil
 }
 
+// GetHistoricalPerformanceWithMetrics calculates historical portfolio performance with metrics
+func (s *AnalyticsService) GetHistoricalPerformanceWithMetrics(userID primitive.ObjectID, period string, currency string) (*PerformanceResponse, error) {
+	// Get performance data points
+	dataPoints, err := s.GetHistoricalPerformance(userID, period, currency)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Calculate metrics from data points
+	var metrics *PerformanceMetrics
+	if len(dataPoints) > 0 {
+		metrics, err = s.CalculatePerformanceMetrics(dataPoints)
+		if err != nil {
+			// Log error but continue with empty metrics
+			fmt.Printf("Warning: failed to calculate performance metrics: %v\n", err)
+			metrics = &PerformanceMetrics{}
+		}
+	} else {
+		// Empty metrics for no data
+		metrics = &PerformanceMetrics{}
+	}
+	
+	return &PerformanceResponse{
+		Period:      period,
+		Currency:    currency,
+		Performance: dataPoints,
+		Metrics:     metrics,
+	}, nil
+}
+
 // GetHistoricalPerformance calculates historical portfolio performance
 func (s *AnalyticsService) GetHistoricalPerformance(userID primitive.ObjectID, period string, currency string) ([]PerformanceDataPoint, error) {
 	// Validate period
-	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true}
+	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true, "ALL": true}
 	if !validPeriods[period] {
-		return nil, fmt.Errorf("invalid period: must be 1M, 3M, 6M, or 1Y")
+		return nil, fmt.Errorf("invalid period: must be 1M, 3M, 6M, 1Y, or ALL")
 	}
 	
 	// Validate currency
@@ -230,6 +311,9 @@ func (s *AnalyticsService) GetHistoricalPerformance(userID primitive.ObjectID, p
 		startTime = endTime.AddDate(0, -6, 0)
 	case "1Y":
 		startTime = endTime.AddDate(-1, 0, 0)
+	case "ALL":
+		// For ALL, use a very old date (10 years ago)
+		startTime = endTime.AddDate(-10, 0, 0)
 	}
 	
 	// Fetch all user transactions
@@ -367,9 +451,34 @@ func (s *AnalyticsService) GetHistoricalPerformance(userID primitive.ObjectID, p
 		}
 		
 		performanceData = append(performanceData, PerformanceDataPoint{
-			Date:  date,
-			Value: portfolioValue,
+			Date:             date,
+			Value:            portfolioValue,
+			PercentageReturn: 0, // Will calculate after all points are collected
+			DayChange:        0, // Will calculate after all points are collected
+			DayChangePercent: 0, // Will calculate after all points are collected
 		})
+	}
+	
+	// Calculate percentage return and day-over-day changes
+	if len(performanceData) > 0 {
+		initialValue := performanceData[0].Value
+		
+		for i := range performanceData {
+			// Calculate percentage return from initial value
+			if initialValue > 0 {
+				performanceData[i].PercentageReturn = ((performanceData[i].Value - initialValue) / initialValue) * 100
+			}
+			
+			// Calculate day-over-day change
+			if i > 0 {
+				prevValue := performanceData[i-1].Value
+				performanceData[i].DayChange = performanceData[i].Value - prevValue
+				
+				if prevValue > 0 {
+					performanceData[i].DayChangePercent = (performanceData[i].DayChange / prevValue) * 100
+				}
+			}
+		}
 	}
 	
 	return performanceData, nil
@@ -690,6 +799,319 @@ func (s *AnalyticsService) groupByCurrency(holdings []Holding, portfolioMap map[
 	}
 
 	return groups
+}
+
+// CalculatePerformanceMetrics calculates all performance metrics from data points
+func (s *AnalyticsService) CalculatePerformanceMetrics(dataPoints []PerformanceDataPoint) (*PerformanceMetrics, error) {
+	if len(dataPoints) == 0 {
+		return nil, fmt.Errorf("no data points provided")
+	}
+	
+	// Initialize empty metrics for edge cases
+	metrics := &PerformanceMetrics{
+		TotalReturn: ReturnMetric{
+			Absolute:   0,
+			Percentage: 0,
+		},
+		PeriodReturn: ReturnMetric{
+			Absolute:   0,
+			Percentage: 0,
+		},
+		BestDay: DayMetric{
+			Date:          time.Time{},
+			Change:        0,
+			ChangePercent: 0,
+		},
+		WorstDay: DayMetric{
+			Date:          time.Time{},
+			Change:        0,
+			ChangePercent: 0,
+		},
+		MaxDrawdown: DrawdownMetric{
+			Percentage:  0,
+			Absolute:    0,
+			PeakDate:    time.Time{},
+			TroughDate:  time.Time{},
+			PeakValue:   0,
+			TroughValue: 0,
+		},
+		RecoveryTime: RecoveryMetric{
+			Status:      "recovered",
+			Days:        0,
+			AverageDays: 0,
+		},
+	}
+	
+	// Single data point - no meaningful metrics
+	if len(dataPoints) == 1 {
+		return metrics, nil
+	}
+	
+	// Calculate total return (first to last)
+	initialValue := dataPoints[0].Value
+	finalValue := dataPoints[len(dataPoints)-1].Value
+	
+	metrics.TotalReturn.Absolute = finalValue - initialValue
+	if initialValue > 0 {
+		metrics.TotalReturn.Percentage = ((finalValue - initialValue) / initialValue) * 100
+	}
+	
+	// Period return is the same as total return for the selected period
+	metrics.PeriodReturn = metrics.TotalReturn
+	
+	// Calculate best and worst days
+	bestDay, worstDay, err := s.FindBestAndWorstDays(dataPoints)
+	if err == nil {
+		metrics.BestDay = bestDay
+		metrics.WorstDay = worstDay
+	}
+	
+	// Calculate maximum drawdown
+	maxDrawdown, err := s.CalculateMaxDrawdown(dataPoints)
+	if err == nil && maxDrawdown != nil {
+		metrics.MaxDrawdown = *maxDrawdown
+	}
+	
+	// Calculate recovery time
+	recoveryTime, err := s.CalculateRecoveryTime(dataPoints)
+	if err == nil && recoveryTime != nil {
+		metrics.RecoveryTime = *recoveryTime
+	}
+	
+	return metrics, nil
+}
+
+// FindBestAndWorstDays identifies the best and worst performing days
+func (s *AnalyticsService) FindBestAndWorstDays(dataPoints []PerformanceDataPoint) (DayMetric, DayMetric, error) {
+	if len(dataPoints) < 2 {
+		// Need at least 2 points to calculate day-over-day changes
+		emptyMetric := DayMetric{
+			Date:          time.Time{},
+			Change:        0,
+			ChangePercent: 0,
+		}
+		return emptyMetric, emptyMetric, fmt.Errorf("insufficient data points")
+	}
+	
+	// Initialize with first day's change
+	bestDay := DayMetric{
+		Date:          dataPoints[1].Date,
+		Change:        dataPoints[1].Value - dataPoints[0].Value,
+		ChangePercent: 0,
+	}
+	if dataPoints[0].Value > 0 {
+		bestDay.ChangePercent = ((dataPoints[1].Value - dataPoints[0].Value) / dataPoints[0].Value) * 100
+	}
+	
+	worstDay := bestDay
+	
+	// Iterate through consecutive pairs
+	for i := 1; i < len(dataPoints); i++ {
+		prevValue := dataPoints[i-1].Value
+		currValue := dataPoints[i].Value
+		
+		dayChange := currValue - prevValue
+		dayChangePercent := 0.0
+		if prevValue > 0 {
+			dayChangePercent = (dayChange / prevValue) * 100
+		}
+		
+		// Update best day if this change is better
+		if dayChange > bestDay.Change {
+			bestDay = DayMetric{
+				Date:          dataPoints[i].Date,
+				Change:        dayChange,
+				ChangePercent: dayChangePercent,
+			}
+		}
+		
+		// Update worst day if this change is worse
+		if dayChange < worstDay.Change {
+			worstDay = DayMetric{
+				Date:          dataPoints[i].Date,
+				Change:        dayChange,
+				ChangePercent: dayChangePercent,
+			}
+		}
+	}
+	
+	return bestDay, worstDay, nil
+}
+
+// CalculateRecoveryTime calculates recovery time for drawdowns
+func (s *AnalyticsService) CalculateRecoveryTime(dataPoints []PerformanceDataPoint) (*RecoveryMetric, error) {
+	if len(dataPoints) == 0 {
+		return nil, fmt.Errorf("no data points provided")
+	}
+	
+	if len(dataPoints) == 1 {
+		return &RecoveryMetric{
+			Status:      "recovered",
+			Days:        0,
+			AverageDays: 0,
+		}, nil
+	}
+	
+	// Track all significant drawdowns (>5%) and their recovery times
+	type drawdownPeriod struct {
+		peakValue   float64
+		peakDate    time.Time
+		troughDate  time.Time
+		recoveryDate time.Time
+		recovered   bool
+	}
+	
+	var drawdowns []drawdownPeriod
+	peak := dataPoints[0].Value
+	peakDate := dataPoints[0].Date
+	inDrawdown := false
+	var currentDrawdown drawdownPeriod
+	
+	for i, point := range dataPoints {
+		// Update peak if current value is higher
+		if point.Value > peak {
+			// If we were in a drawdown and recovered
+			if inDrawdown && currentDrawdown.peakValue > 0 {
+				currentDrawdown.recoveryDate = point.Date
+				currentDrawdown.recovered = true
+				drawdowns = append(drawdowns, currentDrawdown)
+				inDrawdown = false
+			}
+			peak = point.Value
+			peakDate = point.Date
+		}
+		
+		// Calculate current drawdown percentage
+		if peak > 0 {
+			drawdownPercent := ((peak - point.Value) / peak) * 100
+			
+			// Check if this is a significant drawdown (>5%)
+			if drawdownPercent > 5.0 && !inDrawdown {
+				// Start tracking new drawdown
+				inDrawdown = true
+				currentDrawdown = drawdownPeriod{
+					peakValue:  peak,
+					peakDate:   peakDate,
+					troughDate: point.Date,
+					recovered:  false,
+				}
+			} else if inDrawdown {
+				// Update trough date if value continues to decline
+				if point.Value < dataPoints[i-1].Value {
+					currentDrawdown.troughDate = point.Date
+				}
+			}
+		}
+	}
+	
+	// Check if currently in drawdown
+	lastValue := dataPoints[len(dataPoints)-1].Value
+	currentPeak := peak
+	currentDrawdownPercent := 0.0
+	if currentPeak > 0 {
+		currentDrawdownPercent = ((currentPeak - lastValue) / currentPeak) * 100
+	}
+	
+	status := "recovered"
+	days := 0
+	
+	if currentDrawdownPercent > 5.0 {
+		// Currently in drawdown
+		status = "in_drawdown"
+		days = int(time.Since(peakDate).Hours() / 24)
+	} else if len(drawdowns) > 0 {
+		// Use the most recent recovery
+		lastRecovery := drawdowns[len(drawdowns)-1]
+		if lastRecovery.recovered {
+			days = int(lastRecovery.recoveryDate.Sub(lastRecovery.troughDate).Hours() / 24)
+		}
+	}
+	
+	// Calculate average recovery time for all recovered drawdowns
+	averageDays := 0.0
+	recoveredCount := 0
+	totalDays := 0
+	
+	for _, dd := range drawdowns {
+		if dd.recovered {
+			recoveryDays := int(dd.recoveryDate.Sub(dd.troughDate).Hours() / 24)
+			totalDays += recoveryDays
+			recoveredCount++
+		}
+	}
+	
+	if recoveredCount > 0 {
+		averageDays = float64(totalDays) / float64(recoveredCount)
+	}
+	
+	return &RecoveryMetric{
+		Status:      status,
+		Days:        days,
+		AverageDays: averageDays,
+	}, nil
+}
+
+// CalculateMaxDrawdown finds the maximum drawdown in the performance data
+func (s *AnalyticsService) CalculateMaxDrawdown(dataPoints []PerformanceDataPoint) (*DrawdownMetric, error) {
+	if len(dataPoints) == 0 {
+		return nil, fmt.Errorf("no data points provided")
+	}
+	
+	if len(dataPoints) == 1 {
+		// No drawdown with single data point
+		return &DrawdownMetric{
+			Percentage:  0,
+			Absolute:    0,
+			PeakDate:    dataPoints[0].Date,
+			TroughDate:  dataPoints[0].Date,
+			PeakValue:   dataPoints[0].Value,
+			TroughValue: dataPoints[0].Value,
+		}, nil
+	}
+	
+	// Initialize tracking variables
+	peak := dataPoints[0].Value
+	peakDate := dataPoints[0].Date
+	maxDrawdown := 0.0
+	maxDrawdownAbsolute := 0.0
+	troughDate := dataPoints[0].Date
+	troughValue := dataPoints[0].Value
+	finalPeakDate := peakDate
+	finalPeakValue := peak
+	
+	// Iterate through all data points
+	for _, point := range dataPoints {
+		// Update peak if current value is higher
+		if point.Value > peak {
+			peak = point.Value
+			peakDate = point.Date
+		}
+		
+		// Calculate current drawdown from peak
+		if peak > 0 {
+			drawdown := ((peak - point.Value) / peak) * 100
+			drawdownAbsolute := peak - point.Value
+			
+			// Update max drawdown if current is larger
+			if drawdown > maxDrawdown {
+				maxDrawdown = drawdown
+				maxDrawdownAbsolute = drawdownAbsolute
+				troughDate = point.Date
+				troughValue = point.Value
+				finalPeakDate = peakDate
+				finalPeakValue = peak
+			}
+		}
+	}
+	
+	return &DrawdownMetric{
+		Percentage:  maxDrawdown,
+		Absolute:    maxDrawdownAbsolute,
+		PeakDate:    finalPeakDate,
+		TroughDate:  troughDate,
+		PeakValue:   finalPeakValue,
+		TroughValue: troughValue,
+	}, nil
 }
 
 // getPreviousDayPrice fetches the previous trading day's closing price for a symbol

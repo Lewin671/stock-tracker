@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import HistoricalPerformanceChart from '../components/HistoricalPerformanceChart';
-import { MetricCard } from '../components/ui/MetricCard';
+import EnhancedPerformanceChart from '../components/EnhancedPerformanceChart';
+import PerformanceMetricsGrid, { PerformanceMetrics } from '../components/PerformanceMetricsGrid';
 
 const PerformancePage: React.FC = () => {
     const [currency, setCurrency] = useState<'USD' | 'RMB'>('USD');
+    const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
+    const [period] = useState<string>('1M');
 
     const handleCurrencyChange = (value: string) => {
         if (value === 'USD' || value === 'RMB') {
             setCurrency(value);
         }
+    };
+
+    const handleMetricsLoad = (loadedMetrics: PerformanceMetrics) => {
+        setMetrics(loadedMetrics);
     };
 
     return (
@@ -43,18 +49,19 @@ const PerformancePage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Performance Chart */}
-            <div className="space-y-6">
-                <HistoricalPerformanceChart currency={currency} />
+            {/* Performance Metrics Grid */}
+            <PerformanceMetricsGrid 
+                metrics={metrics} 
+                currency={currency} 
+                period={period}
+                loading={!metrics}
+            />
 
-                {/* Additional metrics can be added here in the future */}
-                <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
-                    <h3 className="font-semibold text-lg mb-4">Performance Analytics</h3>
-                    <p className="text-muted-foreground text-sm">
-                        Detailed performance analytics and insights will be displayed here.
-                    </p>
-                </div>
-            </div>
+            {/* Enhanced Performance Chart */}
+            <EnhancedPerformanceChart 
+                currency={currency} 
+                onMetricsLoad={handleMetricsLoad}
+            />
         </DashboardLayout>
     );
 };
