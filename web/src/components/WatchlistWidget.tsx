@@ -27,18 +27,18 @@ export const WatchlistWidget: React.FC = () => {
                         {watchlist.map((item) => (
                             <div
                                 key={item.symbol}
-                                className="flex items-center justify-between p-3 hover:bg-accent/50 rounded-lg group cursor-pointer transition-colors"
+                                className="flex items-start justify-between p-3 hover:bg-accent/50 rounded-lg group cursor-pointer transition-colors gap-2"
                             >
-                                <div className="flex flex-col min-w-0">
+                                <div className="flex flex-col min-w-0 flex-1">
                                     <span className="font-bold text-sm">{item.symbol}</span>
-                                    <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                    <span className="text-xs text-muted-foreground break-words leading-tight">
                                         {item.name}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3 flex-shrink-0">
                                     {/* Mini Chart */}
                                     {item.sparklineData && item.sparklineData.length > 0 && (
-                                        <div className="w-16 h-8 hidden sm:block">
+                                        <div className="w-12 h-8 hidden lg:block">
                                             <svg viewBox="0 0 100 40" className="w-full h-full stroke-current fill-none">
                                                 <path
                                                     d={(() => {
@@ -61,13 +61,13 @@ export const WatchlistWidget: React.FC = () => {
                                             </svg>
                                         </div>
                                     )}
-                                    <div className="flex flex-col items-end min-w-[80px]">
-                                        <span className="font-medium text-sm">
+                                    <div className="flex flex-col items-end min-w-[70px]">
+                                        <span className="font-medium text-sm whitespace-nowrap">
                                             {item.currency === 'CNY' ? '¥' : '$'}
                                             {item.price.toFixed(2)}
                                         </span>
                                         <span
-                                            className={`text-xs font-medium flex items-center ${item.change >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                                            className={`text-xs font-medium flex items-center whitespace-nowrap ${item.change >= 0 ? 'text-emerald-500' : 'text-rose-500'
                                                 }`}
                                         >
                                             {item.change >= 0 ? (
