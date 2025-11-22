@@ -32,12 +32,23 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
     return symbol;
   };
 
-  // Sort holdings: non-cash first, then cash at the bottom
+  // Calculate total value for percentage calculation
+  const totalValue = holdings.reduce((sum, holding) => sum + holding.currentValue, 0);
+
+  // Sort holdings: cash at bottom, non-cash sorted by allocation (descending)
   const sortedHoldings = [...holdings].sort((a, b) => {
     const aIsCash = isCashSymbol(a.symbol);
     const bIsCash = isCashSymbol(b.symbol);
+    
+    // Cash always goes to the bottom
     if (aIsCash && !bIsCash) return 1;
     if (!aIsCash && bIsCash) return -1;
+    
+    // For non-cash holdings, sort by allocation percentage (descending)
+    if (!aIsCash && !bIsCash) {
+      return b.currentValue - a.currentValue;
+    }
+    
     return 0;
   });
 
@@ -61,6 +72,7 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
               <th className="px-4 py-3 text-right">Avg. Cost</th>
               <th className="px-4 py-3 text-right">Price</th>
               <th className="px-4 py-3 text-right">Value</th>
+              <th className="px-4 py-3 text-right">Allocation</th>
               <th className="px-4 py-3 text-right">Return</th>
               <th className="px-4 py-3 text-right">Return %</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -69,6 +81,7 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
           <tbody className="divide-y divide-border">
             {sortedHoldings.map((holding) => {
               const isCash = isCashSymbol(holding.symbol);
+              const allocationPercent = totalValue > 0 ? (holding.currentValue / totalValue) * 100 : 0;
               return (
                 <tr key={holding.symbol} className="hover:bg-muted/50 transition-colors">
                   <td className="px-4 py-3">
@@ -93,6 +106,9 @@ const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, currency, onVie
                   </td>
                   <td className="px-4 py-3 text-right font-bold">
                     {formatCurrency(holding.currentValue, holding.currency)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-blue-600 dark:text-blue-400">
+                    {allocationPercent.toFixed(2)}%
                   </td>
                   <td className={`px-4 py-3 text-right font-medium ${isCash ? 'text-muted-foreground' : holding.gainLoss >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {isCash ? '-' : formatCurrency(holding.gainLoss, holding.currency)}
