@@ -102,6 +102,17 @@ const EnhancedPerformanceChart: React.FC<EnhancedPerformanceChartProps> = ({
       const performanceData = response.data.performance || [];
       const metrics = response.data.metrics;
       
+      // Debug: Log first and last data points
+      if (performanceData.length > 0) {
+        console.log('Performance Data:', {
+          period,
+          currency,
+          firstPoint: performanceData[0],
+          lastPoint: performanceData[performanceData.length - 1],
+          totalPoints: performanceData.length
+        });
+      }
+      
       setData(Array.isArray(performanceData) ? performanceData : []);
       
       if (metrics && metrics.maxDrawdown) {

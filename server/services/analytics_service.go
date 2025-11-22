@@ -461,11 +461,20 @@ func (s *AnalyticsService) GetHistoricalPerformance(userID primitive.ObjectID, p
 	
 	// Calculate percentage return and day-over-day changes
 	if len(performanceData) > 0 {
-		initialValue := performanceData[0].Value
+		// Find the first non-zero value as the initial value for percentage calculation
+		initialValue := 0.0
+		initialIndex := 0
+		for i, point := range performanceData {
+			if point.Value > 0 {
+				initialValue = point.Value
+				initialIndex = i
+				break
+			}
+		}
 		
 		for i := range performanceData {
 			// Calculate percentage return from initial value
-			if initialValue > 0 {
+			if initialValue > 0 && i >= initialIndex {
 				performanceData[i].PercentageReturn = ((performanceData[i].Value - initialValue) / initialValue) * 100
 			}
 			
