@@ -656,6 +656,41 @@ func (s *StockAPIService) GetHistoricalData(symbol string, period string) ([]His
 		return nil, ErrInvalidSymbol
 	}
 	
+	// Handle cash symbols - return flat historical data at price 1.0
+	if s.IsCashSymbol(symbol) {
+		fmt.Printf("[StockAPI] Cash symbol detected in GetHistoricalData: %s, returning flat price data\n", symbol)
+		
+		// Calculate time range based on period
+		endTime := time.Now()
+		var startTime time.Time
+		
+		switch period {
+		case "1M":
+			startTime = endTime.AddDate(0, -1, 0)
+		case "3M":
+			startTime = endTime.AddDate(0, -3, 0)
+		case "6M":
+			startTime = endTime.AddDate(0, -6, 0)
+		case "1Y":
+			startTime = endTime.AddDate(-1, 0, 0)
+		case "ALL":
+			startTime = endTime.AddDate(-10, 0, 0)
+		default:
+			startTime = endTime.AddDate(0, -1, 0)
+		}
+		
+		// Generate daily data points with price 1.0
+		var historicalData []HistoricalPrice
+		for date := startTime; date.Before(endTime) || date.Equal(endTime); date = date.AddDate(0, 0, 1) {
+			historicalData = append(historicalData, HistoricalPrice{
+				Date:  date,
+				Price: 1.0,
+			})
+		}
+		
+		return historicalData, nil
+	}
+	
 	// Validate period
 	validPeriods := map[string]bool{"1M": true, "3M": true, "6M": true, "1Y": true, "ALL": true}
 	if !validPeriods[period] {

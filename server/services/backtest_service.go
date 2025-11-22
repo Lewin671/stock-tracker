@@ -359,14 +359,22 @@ func (s *BacktestService) calculateBacktestPerformance(
 	for symbol, weight := range weights {
 		prices, ok := historicalPrices[symbol]
 		if !ok || len(prices) == 0 {
+			fmt.Printf("[Backtest] Warning: no historical prices available for %s, skipping\n", symbol)
 			continue
 		}
 
-		// Find the price at start date
+		// Find the price at start date (or closest available date)
 		startPrice := s.findPriceForDate(prices, startDate)
 		if startPrice <= 0 {
-			fmt.Printf("[Backtest] Warning: no start price found for %s\n", symbol)
-			continue
+			// Try to use the first available price if no price found at start date
+			if len(prices) > 0 {
+				startPrice = prices[0].Price
+				fmt.Printf("[Backtest] Warning: no start price found for %s at %s, using first available price %.2f at %s\n", 
+					symbol, startDate.Format("2006-01-02"), startPrice, prices[0].Date.Format("2006-01-02"))
+			} else {
+				fmt.Printf("[Backtest] Warning: no start price found for %s, skipping\n", symbol)
+				continue
+			}
 		}
 
 		// Calculate initial investment amount for this asset
@@ -467,6 +475,7 @@ func (s *BacktestService) calculateBacktestPerformance(
 }
 
 // findPriceForDate finds the price for a specific date or the closest previous date
+// If no previous date is found, it will use the closest future date within 30 days
 func (s *BacktestService) findPriceForDate(prices []HistoricalPrice, targetDate time.Time) float64 {
 	if len(prices) == 0 {
 		return 0
@@ -474,6 +483,8 @@ func (s *BacktestService) findPriceForDate(prices []HistoricalPrice, targetDate 
 
 	var closestPrice float64
 	var closestDate time.Time
+	var closestFuturePrice float64
+	var closestFutureDate time.Time
 
 	for _, price := range prices {
 		// If exact match, return immediately
@@ -481,16 +492,33 @@ func (s *BacktestService) findPriceForDate(prices []HistoricalPrice, targetDate 
 			return price.Price
 		}
 
-		// If this price is before or on target date and closer than previous closest
+		// Track closest previous or equal date
 		if (price.Date.Before(targetDate) || price.Date.Equal(targetDate)) {
 			if closestDate.IsZero() || price.Date.After(closestDate) {
 				closestDate = price.Date
 				closestPrice = price.Price
 			}
 		}
+
+		// Track closest future date (within 30 days) as fallback
+		if price.Date.After(targetDate) {
+			daysDiff := price.Date.Sub(targetDate).Hours() / 24
+			if daysDiff <= 30 {
+				if closestFutureDate.IsZero() || price.Date.Before(closestFutureDate) {
+					closestFutureDate = price.Date
+					closestFuturePrice = price.Price
+				}
+			}
+		}
 	}
 
-	return closestPrice
+	// Return closest previous price if found
+	if closestPrice > 0 {
+		return closestPrice
+	}
+
+	// Otherwise return closest future price as fallback
+	return closestFuturePrice
 }
 
 // calculateBacktestMetrics calculates performance metrics
