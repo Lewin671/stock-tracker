@@ -14,16 +14,19 @@ import {
   DashboardMetrics,
   GroupedDashboardMetrics,
   GroupingMode,
+  Holding,
 } from '../api/analytics';
 import { loadGroupingMode, saveGroupingMode } from '../utils/groupingMode';
 import { useToast } from '../contexts/ToastContext';
 import { formatErrorMessage } from '../utils/errorHandler';
+import axiosInstance from '../api/axios';
 
 const DashboardPage: React.FC = () => {
   const { showError } = useToast();
   const [currency, setCurrency] = useState<'USD' | 'RMB'>('USD');
   const [groupingMode, setGroupingMode] = useState<GroupingMode>(() => loadGroupingMode());
   const [metrics, setMetrics] = useState<DashboardMetrics | GroupedDashboardMetrics | null>(null);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +41,15 @@ const DashboardPage: React.FC = () => {
     try {
       const data = await getDashboardMetrics(currency, groupingMode);
       setMetrics(data);
+
+      // For 'none' mode, fetch full holdings data
+      if (groupingMode === 'none') {
+        const response = await axiosInstance.get('/api/portfolio/holdings', {
+          params: { currency },
+        });
+        const holdingsData = response.data.holdings || [];
+        setHoldings(Array.isArray(holdingsData) ? holdingsData : []);
+      }
     } catch (err: any) {
       const errorMessage = formatErrorMessage(err);
       setError(errorMessage);
@@ -198,52 +210,7 @@ const DashboardPage: React.FC = () => {
                 />
               ) : (
                 <HoldingsTable
-                  holdings={metrics.allocation.map(a => {
-                    // We need to find the holding details.
-                    // Since metrics.allocation only has symbol, value, percentage,
-                    // we might need to fetch holdings separately or assume metrics includes them.
-                    // Checking the API type, DashboardMetrics has 'allocation' which is AllocationItem[].
-                    // It does NOT have the full list of holdings in 'none' mode?
-                    // Let's check API again.
-                    // DashboardMetrics: allocation: AllocationItem[]
-                    // AllocationItem: symbol, value, percentage.
-                    // It seems we are missing data for HoldingsTable (shares, costBasis, etc.) in 'none' mode from getDashboardMetrics.
-                    // However, the previous implementation of DashboardPage didn't show a table for 'none' mode?
-                    // Wait, previous implementation:
-                    /*
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <AllocationPieChart ... />
-                        <HistoricalPerformanceChart ... />
-                    </div>
-                    */
-                    // It didn't show holdings list in 'none' mode!
-                    // But the user wants "Personal Holdings".
-                    // I should probably fetch holdings if they are not in metrics.
-                    // Or I can just show the AllocationPieChart and PerformanceChart as before,
-                    // and maybe add a "View All Holdings" link to /holdings page.
-                    // But wait, GroupedHoldingsView IS shown for grouped metrics.
-                    // Let's look at GroupedHoldingsView usage.
-                    // It takes `groups`.
-                    // If I want to show holdings in 'none' mode, I need the data.
-                    // Since I can't easily change the backend to return full holdings in dashboard metrics (without exploring server code),
-                    // I will stick to the previous behavior for 'none' mode but wrap it in the new design,
-                    // AND add a button to go to the full Holdings page.
-                    // OR, I can try to fetch holdings from another endpoint.
-                    // Let's check if there is a useHoldings hook or similar.
-                    // I'll just leave it as is for now (no table for 'none' mode) but add a clear message/link.
-                    // Actually, I'll revert to the previous behavior of just showing charts for 'none' mode,
-                    // but I'll add a "View All Holdings" button.
-                    return {
-                      symbol: a.symbol,
-                      shares: 0, // Placeholder
-                      costBasis: 0, // Placeholder
-                      currentPrice: 0, // Placeholder
-                      currentValue: a.value,
-                      gainLoss: 0, // Placeholder
-                      gainLossPercent: 0, // Placeholder
-                      currency: currency
-                    };
-                  })}
+                  holdings={holdings}
                   currency={currency}
                   onViewTransactions={handleViewTransactions}
                   onEditAsset={handleEditAsset}
